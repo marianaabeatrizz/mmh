@@ -1,0 +1,23 @@
+# Segredos — NUNCA versionar a chave da OpenAI
+.env
+.env.*
+*.key
+
+# Caches de chamadas LLM (contêm texto do domínio; regeneráveis)
+cache_extracao_llm.json
+cache_graphrag_llm.json
+
+# Artefatos pesados/gerados
+__pycache__/
+*.pyc
+*.bak-*
+RECUPERADO_*
+
+# Saídas regeneráveis do pipeline (o código que as produz está versionado)
+run_*.log
+rede_semantica_skos.ttl
+ontologia_mmh.owl
+fila_curadoria.csv
+
+# Fila de curadoria JÁ REVISADA pelo especialista NÃO entra aqui:
+# fila_curadoria_revisada.csv é entrada do pipeline e deve ser versionada.

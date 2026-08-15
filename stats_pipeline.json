@@ -1,0 +1,188 @@
+{
+  "fase0": {
+    "n_pares_gabarito": 1264,
+    "n_ok_sem_flags": 809,
+    "n_catalogo": 1054,
+    "n_consultas": 1012,
+    "n_classes_efisco": 19,
+    "n_classes_catmat": 30,
+    "n_pdms_catalogo": 191
+  },
+  "fase1": {
+    "n_nos": 5009,
+    "n_arestas": 48996,
+    "n_com_pdm": 1012,
+    "taxa_oov": 0.19910279467334854
+  },
+  "fase2": {
+    "fonte_extracao": {
+      "llm": 0,
+      "regex": 2066,
+      "erros_llm": 0
+    },
+    "n_completos": 777,
+    "escore_medio_completude": 0.8695652173913043,
+    "n_consultas_com_atributos": 914,
+    "n_catalogo_com_atributos": 1054
+  },
+  "fase3": {
+    "n_pares_candidatos": 39809,
+    "bloco_medio": 39.33695652173913,
+    "bloco_max": 155,
+    "origem_bloco": {
+      "pdm": 1012
+    },
+    "recall_blocking": 0.7203557312252964
+  },
+  "fase4": {
+    "n_classes_pdm": 208,
+    "n_propriedades": 11,
+    "n_individuos": 2058,
+    "n_regras_swrl": 15,
+    "por_deducao": {
+      "equivalenteA": 1341,
+      "incompleto": 28256,
+      "veto": 10212
+    }
+  },
+  "fase5": {
+    "modelo_embedding": "intfloat/multilingual-e5-base",
+    "encoder_assimetrico": true,
+    "cross_encoder": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "n_pares_pontuados": 13404,
+    "score_cosine_medio": 0.8754569883757084,
+    "score_cross_medio": 0.48144775481363145,
+    "score_neural_medio": 0.7572542183070853
+  },
+  "fase6": {
+    "n_arestas_sim": 1658,
+    "n_zona_cinzenta": 314,
+    "adjudicacao_llm": 0,
+    "adjudicacao_votacao": 196,
+    "adjudicacao_erros": 0
+  },
+  "fase7": {
+    "n_nos": 2257,
+    "n_arestas": 15470,
+    "n_equivalenteA": 824,
+    "n_candidatoA": 12580
+  },
+  "fase8": {
+    "n_pares": 13404,
+    "n_decisoes": 1012,
+    "score_medio_top1": 0.6134574110671936,
+    "por_confianca": {
+      "Média": 659,
+      "Baixa": 188,
+      "Alta": 165
+    }
+  },
+  "fase8b": {
+    "n_explicacoes": 0,
+    "motivo_skip": "desligado_por_flag"
+  },
+  "fase9": {
+    "n_comunidades": 174,
+    "tamanhos_comunidades": [
+      34,
+      19,
+      18,
+      15,
+      14,
+      14,
+      12,
+      12,
+      12,
+      10,
+      9,
+      8,
+      8,
+      8,
+      8,
+      8,
+      8,
+      7,
+      7,
+      7
+    ],
+    "n_grupos_duplicatas": 139,
+    "n_anomalias": 684
+  },
+  "avaliacao": {
+    "n_avaliados": 1012,
+    "recall_blocking": 0.7203557312252964,
+    "mrr": 0.41245637596922174,
+    "recall_at_1": 0.3241106719367589,
+    "recall_at_3": 0.4515810276679842,
+    "recall_at_5": 0.5266798418972332,
+    "recall_at_10": 0.6146245059288538,
+    "precisao_at_1": 0.3241106719367589
+  },
+  "tempos_execucao": {
+    "fase_0_fontes": {
+      "wall_s": 2.159,
+      "cpu_s": 1.875
+    },
+    "fase_1_rede_semantica": {
+      "wall_s": 40.916,
+      "cpu_s": 53.141
+    },
+    "fase_2_extracao": {
+      "wall_s": 0.387,
+      "cpu_s": 0.375
+    },
+    "fase_3_blocking": {
+      "wall_s": 1.185,
+      "cpu_s": 1.156
+    },
+    "reasoner_pellet": {
+      "wall_s": 19.509,
+      "cpu_s": 2.531
+    },
+    "fase_4_ontologia": {
+      "wall_s": 21.257,
+      "cpu_s": 4.297
+    },
+    "fase_5_matcher_neural": {
+      "wall_s": 1275.69,
+      "cpu_s": 2156.75
+    },
+    "fase_6_graphrag": {
+      "wall_s": 0.519,
+      "cpu_s": 0.312
+    },
+    "fase_8_confianca": {
+      "wall_s": 0.647,
+      "cpu_s": 0.531
+    },
+    "avaliacao_retrieval": {
+      "wall_s": 0.281,
+      "cpu_s": 0.25
+    },
+    "fase_7_grafo_unificado": {
+      "wall_s": 2.229,
+      "cpu_s": 2.094
+    },
+    "fase_8b_explicabilidade": {
+      "wall_s": 0.0,
+      "cpu_s": 0.0
+    },
+    "fase_9_analise_global": {
+      "wall_s": 1.307,
+      "cpu_s": 1.016
+    }
+  },
+  "config": {
+    "modelo_embedding": "intfloat/multilingual-e5-base",
+    "modelo_cross_encoder": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "modelo_llm": "gpt-4o-mini",
+    "k_rerank": 15,
+    "pesos_score_final": {
+      "ontologia": 0.35,
+      "neural": 0.45,
+      "graphrag": 0.2
+    },
+    "usar_llm": false,
+    "usar_rede_semantica": true
+  }
+}

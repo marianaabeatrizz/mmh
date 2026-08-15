@@ -1,0 +1,238 @@
+reuniao:
+  projeto: "Pipeline neuro-simbólico CATMAT <-> e-Fisco (MMH)"
+  data: "2026-07-21"
+  arquivo_alterado: "pipeline_completo_mmh.py"
+  contexto: >-
+    A partir da rede semântica já entregue, a equipe levantou 3 novos
+    requisitos. Todos implementados nesta sessão, revisados e testados.
+
+resultados_execucao_real:
+  observacao: "Execução completa do pipeline sobre os 1264 pares (base principal MMH)."
+  data_execucao: "2026-07-21"
+
+  avaliacao_retrieval:
+    descricao: >-
+      Recuperação real: cada e-Fisco compete contra os CATMAT do mesmo bloco
+      de PDM (~53 concorrentes em média). NÃO é a métrica antiga de pares gold.
+    itens_avaliados: 1252
+    tam_medio_bloco: 52.7
+    precisao_at_1: 0.357
+    recall_at_5: 0.737
+    recall_at_10: 0.853
+    mrr: 0.525
+    leitura: >-
+      35,7% acerta em 1º lugar; 85,3% no top-10; MRR 0,525 (correto ~2ª posição).
+
+  ontologia_swrl:
+    descricao: "Fix 1.2 confirmado: agora casa atributos definidores dos dois lados."
+    equivalenteA: 238        # 18.8%
+    veto: 151                # 11.9% (atributos divergentes rejeitados)
+    incompleto: 803
+    broadMatch: 72
+    exemplo_real: "[calibre] 18G ≈ 18G ; [comprimento_valor] 15 ≈ 15 -> equivalenteA"
+
+  cobertura_limiar:
+    gold_ok_aprovados_alta_media: 0.755
+    nota: "Métrica honesta (só pares positivos); substitui a antiga 'recall'."
+
+  custo_computacional:
+    tempo_total_wall_s: 223.2
+    tempo_total_cpu_s: 341.0
+    gpu_pico_mb: 0            # máquina sem CUDA nesta execução
+    gargalo: "fase_5_matcher_neural = 204.9s wall / 325.2s CPU (~92% do tempo)"
+    fases_rapidas: "ontologia 0.1s | retrieval 0.6s | grafo 0.4s | blocking 0.2s"
+
+  fase_8b_llm: "pulada (sem ANTHROPIC_API_KEY) — 0.0s, sem quebrar o pipeline"
+
+contexto_do_projeto:
+  pergunta_da_equipe: "Onde este pipeline entra no projeto e quais os benefícios?"
+
+  problema_de_fundo: >-
+    Compras públicas de material médico-hospitalar (MMH) em Pernambuco são
+    descritas no e-Fisco (SEFAZ-PE) em TEXTO LIVRE, com jargão, abreviações e
+    ruído jurídico. O catálogo federal CATMAT é ESTRUTURADO (tipo + atributos).
+    Não há pares rotulados ligando os dois. Sem essa ligação, não dá para
+    comparar preços, fornecedores nem consolidar gasto entre órgãos.
+
+  onde_o_pipeline_entra:
+    posicao: >-
+      É o MOTOR DE RECONCILIAÇÃO semântica no meio do fluxo: recebe os itens
+      crus do e-Fisco e do CATMAT e produz o casamento item↔item com escore de
+      confiança e trilha explicável.
+    fluxo:
+      - "[montante] Ingestão dos dados e-Fisco (SEFAZ-PE) + catálogo CATMAT"
+      - "[ESTE PIPELINE] Rede semântica + ontologia + neural + GraphRAG -> pares com confiança + grafo unificado"
+      - "[jusante] Análise de gasto, comparação de preços/fornecedores, detecção de anomalias, auditoria"
+    entrega_central: >-
+      O 'grafo unificado' (itens e-Fisco + CATMAT + PDM + arestas :equivalenteA
+      ponderadas pela confiança) é o substrato para as análises de jusante.
+
+  beneficios:
+    tecnicos:
+      - "Casa itens SEM pares rotulados (não supervisionado) — dispensa base anotada custosa."
+      - "Neuro-simbólico: neural cobre o texto ruidoso; ontologia dá dedução auditável por atributo."
+      - "Explicabilidade nativa: cada match tem trilha (score por camada) + frase em linguagem natural (LLM)."
+      - "Confiança calibrada (Alta/Média/Baixa) permite curadoria só onde é preciso."
+    de_negocio_governanca:
+      - "Habilita comparar preços do mesmo item entre órgãos/fornecedores (economia potencial)."
+      - "Consolida o gasto por PDM/classe — visão de quanto se gasta em cada família de material."
+      - "Detecta anomalias e mapeamentos incertos para revisão (controle interno / TCE)."
+      - "Rastreabilidade para auditoria: o 'porquê' de cada equivalência é registrado."
+    para_pesquisa:
+      - "Arquitetura reprodutível (fases [0]-[9]) com métricas por fase e custo computacional."
+      - "Avaliação de recuperação real (recall@k, MRR) para reportar em artigo/relatório."
+
+  observacao_honesta: >-
+    Enquadramento derivado do doc. de arquitetura (casamento CATMAT<->e-Fisco,
+    camada de Governança e sensemaking global) e do código atual. A posição
+    exata dentro do projeto maior (fontes a montante, consumidores a jusante)
+    deve ser confirmada com a equipe — este bloco é uma proposta de encaixe.
+
+requisitos_atendidos:
+
+  - id: 1
+    titulo: "Peso nas arestas = confiança"
+    o_que_a_equipe_pediu: >-
+      Arestas com mais peso devem representar maior confiança.
+    implementacao:
+      funcao: "_atualizar_pesos_grafo_unificado"
+      helper: "_exportar_grafo_unificado (extraído da fase [7])"
+      descricao: >-
+        Propaga o score_final (fase [8]) como atributo 'peso' nas arestas
+        :equivalenteA do grafo unificado. peso ∈ [0,1]; maior peso = maior
+        confiança de equivalência.
+      beneficio: >-
+        Habilita PageRank ponderado e caminho de confiança máxima direto
+        no GraphML (Neo4j/Gephi).
+    saida:
+      - "grafo_unificado.graphml (com peso nas arestas :equivalenteA)"
+
+  - id: 2
+    titulo: "Quantificar tempo de execução (CPU e GPU)"
+    o_que_a_equipe_pediu: >-
+      Medir os gastos de CPU e GPU do pipeline.
+    implementacao:
+      classe: "_Cronometro (context manager por fase)"
+      metricas_por_fase:
+        wall_s: "tempo de parede (perf_counter)"
+        cpu_s: "segundos de CPU do processo (psutil, user+system) — gasto real"
+        cpu_util_pct: "utilização = cpu_s / wall_s (pode passar de 100% com paralelismo)"
+        gpu_mem_pico_mb: "pico de memória GPU (torch.cuda.max_memory_allocated)"
+        gpu_mem_delta_mb: "variação líquida de memória GPU"
+      nota_tecnica: >-
+        Usa torch.cuda.synchronize() para medir corretamente kernels
+        assíncronos nas fases neurais.
+    saida:
+      - "bloco 'tempos_execucao' no resultado_pipeline.yaml"
+      - "seção 'tempos_execucao' no stats_pipeline.json"
+      - "tabela resumo de custo por fase no terminal ao final"
+
+  - id: 3
+    titulo: "LLM como data augmentation para explicabilidade"
+    o_que_a_equipe_pediu: >-
+      Usar LLM para melhorar a explicabilidade dos matches.
+    implementacao:
+      funcao: "fase_8b_explicabilidade_llm"
+      modelo: "claude-haiku-4-5-20251001"
+      descricao: >-
+        Para cada par Alta/Média, gera 1 frase em português explicando o
+        match (linguagem natural, legível por auditor não-técnico). O LLM
+        NÃO decide o match — apenas augmenta a trilha técnica da fase [8].
+      limite_custo: "80 pares por execução (LLM_MAX_PARES)"
+      robustez: >-
+        Degrada graciosamente sem SDK ou sem API key (não quebra o pipeline).
+    saida:
+      - "coluna 'explicacao_llm' no CSV e no YAML"
+      - "stats_fase8b (contagem de explicações geradas)"
+
+bugs_corrigidos_na_revisao:
+  - problema: "GraphML exportado sem os pesos"
+    causa: >-
+      A fase [7] escrevia o arquivo antes de o score_final existir (fase [8]);
+      a atualização ficava só em memória.
+    correcao: "Reexportação do GraphML após atualizar os pesos."
+  - problema: "Métrica de CPU sem sentido"
+    causa: >-
+      psutil.cpu_percent media o sistema inteiro; primeira leitura retorna 0.
+    correcao: "Troca por CPU-segundos do processo (cpu_times) + synchronize na GPU."
+  - problema: "Acesso frágil à resposta do LLM"
+    causa: "resp.content[0].text assumia que o 1º bloco é sempre texto."
+    correcao: "Pega o primeiro bloco com type == 'text' (conforme API oficial)."
+
+validacao:
+  sintaxe: "OK"
+  testes_isolados:
+    - "_Cronometro mede cpu_s real (verificado)"
+    - "peso = score_final na aresta (verificado)"
+    - "peso presente no arquivo .graphml em disco (verificado)"
+  referencia_api: "Model ID e messages.create conferidos contra a doc oficial Anthropic"
+
+pendencias:
+  - item: "ANTHROPIC_API_KEY"
+    status: "pendente por decisão da equipe (aguarda definição sobre API_KEY no projeto)"
+    impacto: >-
+      Sem a chave, a fase [8b] é ignorada com aviso; as demais fases e os
+      requisitos [1] e [2] funcionam normalmente.
+    para_ativar: 'SDK anthropic já instalado (v0.117.1). Basta definir a chave: $env:ANTHROPIC_API_KEY="sk-ant-..."'
+
+revisao_pipeline_completo:
+  escopo: "Revisão dos 3 módulos: preprocessamento_mmh, rede_semantica_mmh, pipeline_completo_mmh"
+  metodo: "Achados confirmados empiricamente nos dados reais antes de corrigir"
+
+  tier_1_validade_metodologica:
+    - id: "1.1"
+      problema: >-
+        Pipeline só pontuava pares do gold (sem negativos); métrica chamada de
+        'recall' era, na verdade, cobertura@limiar. Blocking gerado mas nunca usado.
+      correcao:
+        - "Métrica da fase [8] renomeada para 'cobertura@limiar' (honesta)."
+        - >-
+          Nova avaliação de recuperação real (fase_avaliacao_retrieval): dentro de
+          cada bloco de PDM, os CATMAT dos outros itens atuam como negativos;
+          mede recall@1/@5/@10 e MRR. O blocking passou a ser consumido.
+      evidencia_teste: "EXECUÇÃO REAL (1252 itens): recall@1=0.357 | recall@5=0.737 | recall@10=0.853 | MRR=0.525"
+    - id: "1.2"
+      problema: >-
+        Camada simbólica (ontologia/SWRL) inerte: chaves de atributo do CATMAT
+        eram MAIÚSCULAS e com outra nomenclatura; das 4 definidoras, ZERO existiam
+        no CATMAT -> nunca havia casamento de atributo.
+      correcao: >-
+        Extração CANÔNICA do CATMAT com o mesmo extrator regex do e-Fisco
+        (catmat_atributos_canon); fase [4] compara chaves alinhadas dos dois lados.
+      evidencia_teste: >-
+        EXECUÇÃO REAL: ontologia deduziu 238 equivalenteA (18.8%) e 151 veto
+        (11.9%) com casamento de atributo (ex.: calibre 18G≈18G). Antes: 0.
+
+  tier_2_correcao_estatistica:
+    - id: "2.1"
+      problema: "normalizar_texto(manter_maiusculas) era no-op (os dois ramos .upper())."
+      correcao: "Ramo False agora usa .lower(); call-sites ajustados p/ preservar caixa do corpus."
+      evidencia_teste: "True->'CALIBRE' | False->'calibre'"
+    - id: "2.2"
+      problema: >-
+        NPMI com numerador inflado: cooc montado sobre listas cruas (produto cruz
+        com repetição) enquanto as marginais usavam frequência documental.
+      correcao: "cooc agora usa set() nos dois lados -> mesma base de contagem das marginais."
+
+  tier_3_robustez:
+    - "eval() substituído por _parse_dict (ast.literal_eval) em ~7 pontos."
+    - "Guardas de coluna na fase [0] (match_parcial, situacao, classes)."
+    - "OOV da fase [1] corrigido: token 'orig' (antes 't' vazado) + checa Conceito/Termo/PDM."
+
+  validacao:
+    sintaxe: "OK nos 3 módulos"
+    eval_cru_remanescente: "nenhum"
+    testes_reais: "A (casing), B (ontologia 1.2), C (retrieval 1.1) — todos passaram"
+
+  decisao_de_equipe_pendente:
+    - >-
+      Avaliação com negativos: hoje o dataset só tem pares positivos. A nova
+      fase de retrieval mede competição dentro do bloco; para uma avaliação
+      completa (precisão real fora do gold) seria preciso amostrar negativos
+      top-k de CATMAT — esboço disponível se a equipe aprovar.
+
+proximos_passos_sugeridos:
+  - "Definir origem/gestão da ANTHROPIC_API_KEY no projeto"
+  - "Rodar o pipeline completo e conferir recall@k/MRR reais no resultado_pipeline.yaml"
+  - "Opcional: paralelizar ou usar Batches API na fase [8b] (50% mais barato)"
+  - "Rodar em máquina com CUDA para preencher as métricas de GPU"
