@@ -19,5 +19,11 @@ rede_semantica_skos.ttl
 ontologia_mmh.owl
 fila_curadoria.csv
 
+# Workspace do Microsoft GraphRAG (648 MB de artefatos gerados na indexação)
+graphrag_workspace/
+
+# Subdiretórios de runs por modelo (resultados documentados em RESULTADOS.md)
+resultados/gpt-*/
+
 # Fila de curadoria JÁ REVISADA pelo especialista NÃO entra aqui:
 # fila_curadoria_revisada.csv é entrada do pipeline e deve ser versionada.

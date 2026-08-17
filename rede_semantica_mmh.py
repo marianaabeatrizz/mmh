@@ -60,6 +60,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent
+DADOS_DIR = DATA_DIR / "dados"
+RESULTADOS_DIR = DATA_DIR / "resultados"
 HOJE = str(date.today())
 
 # Versao do lexico (sec. 3.6, "grafo lexico de dominio versionado"): entra no
@@ -603,7 +605,7 @@ def exportar_fila_curadoria(G: nx.MultiDiGraph,
                             destino: Optional[Path] = None,
                             limite: int = 200) -> Path:
     """Grava a fila de curadoria em CSV para o especialista trabalhar nela."""
-    destino = destino or (DATA_DIR / "fila_curadoria.csv")
+    destino = destino or (RESULTADOS_DIR / "fila_curadoria.csv")
     fila = fila_curadoria(G, limite=limite)
     df_fila = pd.DataFrame(fila)
     # Coluna em branco onde o especialista escreve o veredito.
@@ -1155,7 +1157,7 @@ def visualizar_grafo(
     ax.set_title(titulo, color="white", fontsize=13, pad=12)
     ax.axis("off")
 
-    destino = salvar_em or DATA_DIR / "rede_semantica.png"
+    destino = salvar_em or RESULTADOS_DIR / "rede_semantica.png"
     plt.tight_layout()
     plt.savefig(destino, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close()
@@ -1164,7 +1166,7 @@ def visualizar_grafo(
 
 def exportar_graphml(G: nx.MultiDiGraph, destino: Optional[Path] = None) -> Path:
     """Exporta o grafo em GraphML para importacao no Neo4j / Gephi."""
-    destino = destino or DATA_DIR / "rede_semantica.graphml"
+    destino = destino or RESULTADOS_DIR / "rede_semantica.graphml"
     # GraphML nao suporta dict como atributo de no; converte para str se necessario
     G_export = G.copy()
     for n, d in G_export.nodes(data=True):
@@ -1208,7 +1210,7 @@ def exportar_skos(G: nx.MultiDiGraph, destino: Optional[Path] = None) -> Optiona
         log.warning("rdflib ausente — vista SKOS nao exportada.")
         return None
 
-    destino = destino or DATA_DIR / "rede_semantica_skos.ttl"
+    destino = destino or RESULTADOS_DIR / "rede_semantica_skos.ttl"
     MMH = Namespace(f"{IRI_BASE}#")
 
     g = RDFGraph()

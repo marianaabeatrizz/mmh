@@ -7,7 +7,9 @@ Implementação integral do fluxo fim a fim descrito em:
 
 [0] Fontes           — ingestão; separa CATÁLOGO (CATMAT) de CONSULTAS (e-Fisco)
 [1] Rede semântica   — normalização + expansão + desambiguação + ancoragem
-[2] Extração         — texto livre -> atributos PDM (LLM; regex como fallback)
+[2] Extração         — texto livre -> atributos PDM (LLM; regex como fallback);
+                       validação de esquema SHACL (pyshacl) contra as
+                       características definidoras por família (§2.2)
 [3] Blocking         — GERAÇÃO DE CANDIDATOS por Classe/PDM + subsunção
 [4] Ontologia        — OWL + reasoner Pellet (SWRL da §2.2) sobre os candidatos
 [5] Matcher neural   — bi-encoder assimétrico (E5) + cross-encoder (2 estágios)
@@ -61,6 +63,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
+from rdflib import Graph, Namespace, RDF, Literal, BNode
+from rdflib.namespace import SH
+import pyshacl
 
 # Módulos locais do projeto MMH
 sys.path.insert(0, str(Path(__file__).parent))
@@ -85,8 +90,15 @@ from rede_semantica_mmh import (
     visualizar_grafo,
     HIERARQUIA_CURADA,
     DATA_DIR,
+    DADOS_DIR,
+    RESULTADOS_DIR,
     _id_no,
     HOJE,
+)
+from ontologia_owl_mmh import (
+    CARACTERISTICAS_DEFINIDORAS,
+    IRI_ONTOLOGIA,
+    _familia_de,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
@@ -139,6 +151,7 @@ LLM_MODEL_PADRAO = "gpt-4o-mini"
 K_RERANK          = 15     # candidatos que chegam ao cross-encoder
 K_AVALIACAO       = 10     # maior k reportado em recall@k
 MAX_CANDIDATOS    = 400    # teto por consulta (protege blocos gigantes)
+_N_SEM_BLOCKING   = 50    # candidatos cross-PDM por embedding (estratégia 6)
 
 # Limiares de confiança (§4.6)
 LIMIAR_ALTA   = 0.75
@@ -280,7 +293,7 @@ def fase_0_fontes() -> dict:
         "test":      "20260408_ground_truth_mmh_test.csv",
         "opme_test": "20260408_ground_truth_mmh_opme_test.csv",
     }.items():
-        caminho = DATA_DIR / arq
+        caminho = DADOS_DIR / arq
         if caminho.exists():
             d = pd.read_csv(caminho, sep="|", dtype=str, encoding="utf-8-sig")
             d.columns = d.columns.str.strip()
@@ -393,21 +406,21 @@ def fase_1_rede_semantica(estado: dict) -> dict:
     log.info("Construindo grafo léxico de domínio...")
     G = construir_grafo("principal")
 
-    exportar_graphml(G, DATA_DIR / "rede_semantica.graphml")
-    exportar_skos(G, DATA_DIR / "rede_semantica_skos.ttl")
-    exportar_fila_curadoria(G, DATA_DIR / "fila_curadoria.csv")
+    exportar_graphml(G, RESULTADOS_DIR / "rede_semantica.graphml")
+    exportar_skos(G, RESULTADOS_DIR / "rede_semantica_skos.ttl")
+    exportar_fila_curadoria(G, RESULTADOS_DIR / "fila_curadoria.csv")
 
     log.info("Gerando visualizações do grafo...")
     try:
         visualizar_grafo(
             G, pdm_foco="AGULHA PUNCAO OSSEA",
             titulo="Vizinhança: AGULHA PUNCAO OSSEA",
-            salvar_em=DATA_DIR / "rede_semantica_agulha.png",
+            salvar_em=RESULTADOS_DIR / "rede_semantica_agulha.png",
         )
         visualizar_grafo(
             G, pdm_foco=None, max_nos=80,
             titulo="Rede Semântica CATMAT <-> e-Fisco (top 80 nós)",
-            salvar_em=DATA_DIR / "rede_semantica_geral.png",
+            salvar_em=RESULTADOS_DIR / "rede_semantica_geral.png",
         )
     except Exception as exc:
         log.warning("Visualização falhou (%s) — seguindo.", exc)
@@ -603,28 +616,91 @@ def extrair_atributos_regex(texto: str) -> dict:
     return atribs
 
 
-def validar_esquema_pdm(atribs: dict, pdm: str) -> dict:
+# Espaço de nomes da ontologia — o mesmo IRI da fase [4], para que uma
+# violação SHACL aqui e uma dedução OWL lá apontem para o mesmo :atributo.
+MMH = Namespace(f"{IRI_ONTOLOGIA}#")
+
+
+def _construir_shapes_pdm() -> Graph:
     """
-    Validação de integridade do esquema (o papel do SHACL na Figura 1):
-    verifica se as características obrigatórias do PDM estão presentes.
+    Shapes SHACL de verdade (o papel do SHACL na Figura 1): uma sh:NodeShape
+    por família de PDM, com sh:minCount 1 para cada característica
+    DEFINIDORA — a MESMA lista que a regra SWRL da fase [4] usa para deduzir
+    equivalência (CARACTERISTICAS_DEFINIDORAS). Gerado a partir dela, e não
+    escrito à mão, para que as duas fases nunca divirjam sobre o que é
+    "obrigatório" por família.
     """
-    reqs_por_pdm = {
-        "AGULHA":  ["calibre", "comprimento_valor", "esterilidade"],
-        "SERINGA": ["volume_valor", "esterilidade"],
-        "CATETER": ["comprimento_valor", "material", "esterilidade"],
-        "SONDA":   ["calibre", "material"],
-        "FIO":     ["material", "comprimento_valor"],
-    }
-    pdm_upper = (pdm or "").upper()
-    reqs = next((a for f, a in reqs_por_pdm.items() if f in pdm_upper), [])
-    if not reqs:
-        return {"completo": True, "ausentes": [], "escore_completude": 1.0}
-    ausentes = [r for r in reqs if r not in atribs]
-    return {
-        "completo": not ausentes,
-        "ausentes": ausentes,
-        "escore_completude": 1.0 - len(ausentes) / len(reqs),
-    }
+    shapes = Graph()
+    shapes.bind("mmh", MMH)
+    shapes.bind("sh", SH)
+    for familia, obrigatorios in CARACTERISTICAS_DEFINIDORAS.items():
+        forma = MMH[f"Forma{familia}"]
+        shapes.add((forma, RDF.type, SH.NodeShape))
+        shapes.add((forma, SH.targetClass, MMH[familia]))
+        for atributo in obrigatorios:
+            prop = BNode()
+            shapes.add((forma, SH.property, prop))
+            shapes.add((prop, SH.path, MMH[atributo]))
+            shapes.add((prop, SH.minCount, Literal(1)))
+            shapes.add((prop, SH.severity, SH.Violation))
+            shapes.add((prop, SH.message, Literal(
+                f"{familia}: atributo definidor '{atributo}' ausente no esquema PDM.",
+                lang="pt")))
+    return shapes
+
+
+_SHAPES_PDM = _construir_shapes_pdm()
+
+
+def validar_shacl_lote(atributos: list[dict], pdms: list[str]) -> list[dict]:
+    """
+    Valida o esquema PDM extraído contra `_SHAPES_PDM` com o motor pyshacl
+    (SHACL-Core; sem inferência OWL, já que as shapes usam só sh:minCount).
+
+    Roda numa ÚNICA passada sobre todas as linhas — um grafo de dados com um
+    indivíduo por item — em vez de validar item a item: o custo de montar o
+    engine do pyshacl é fixo por chamada, então validar N grafos de 1 item
+    cada é ~N vezes mais caro que validar 1 grafo de N indivíduos.
+    """
+    dados = Graph()
+    dados.bind("mmh", MMH)
+    nos = []  # (uri, obrigatorios) na ordem de entrada, para remontar a saída
+    for i, (atribs, pdm) in enumerate(zip(atributos, pdms)):
+        familia = _familia_de(pdm or "")
+        obrigatorios = CARACTERISTICAS_DEFINIDORAS.get(familia, [])
+        no = MMH[f"item_{i}"]
+        nos.append((no, obrigatorios))
+        if not familia:
+            continue
+        dados.add((no, RDF.type, MMH[familia]))
+        for chave, valor in (atribs or {}).items():
+            if chave in _ATRIBUTOS_PDM_KEYS and valor:
+                dados.add((no, MMH[chave], Literal(str(valor))))
+
+    conforms, relatorio, _ = pyshacl.validate(
+        dados, shacl_graph=_SHAPES_PDM, inference="none",
+        allow_warnings=True, meta_shacl=False,
+    )
+
+    ausentes_por_no: dict[str, set] = defaultdict(set)
+    if not conforms:
+        for resultado, _, foco in relatorio.triples((None, SH.focusNode, None)):
+            caminho = relatorio.value(resultado, SH.resultPath)
+            if caminho is not None:
+                ausentes_por_no[str(foco)].add(str(caminho).rsplit("#", 1)[-1])
+
+    saida = []
+    for no, obrigatorios in nos:
+        if not obrigatorios:
+            saida.append({"completo": True, "ausentes": [], "escore_completude": 1.0})
+            continue
+        ausentes = sorted(ausentes_por_no.get(str(no), set()))
+        saida.append({
+            "completo": not ausentes,
+            "ausentes": ausentes,
+            "escore_completude": 1.0 - len(ausentes) / len(obrigatorios),
+        })
+    return saida
 
 
 def fase_2_extracao(estado: dict) -> dict:
@@ -680,11 +756,10 @@ def fase_2_extracao(estado: dict) -> dict:
     if client is not None:
         _salvar_cache_extracao(cache, _CACHE_EXTRACAO_PATH)
 
-    # Validação de esquema (SHACL da Figura 1)
-    consultas["shacl"] = [
-        validar_esquema_pdm(a, p)
-        for a, p in zip(consultas["atributos"], consultas["pdm_ancoragem"])
-    ]
+    # Validação de esquema — SHACL real (rdflib + pyshacl), papel da Figura 1
+    consultas["shacl"] = validar_shacl_lote(
+        list(consultas["atributos"]), list(consultas["pdm_ancoragem"])
+    )
     n_completos = sum(1 for s in consultas["shacl"] if s["completo"])
     escore_medio = float(np.mean([s["escore_completude"] for s in consultas["shacl"]]))
 
@@ -775,11 +850,34 @@ def fase_3_blocking(estado: dict) -> dict:
     vec_cat = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 4), max_features=20000)
     mat_cat = vec_cat.fit_transform(catalogo["catmat_processado"].fillna(""))
 
+    # --- Estratégia 6: blocking semântico por embedding E5 (cross-PDM) ------
+    # Pré-computado aqui para: (a) elevar o teto do recall, (b) ser reutilizado
+    # pela fase [5] sem segundo encode (economiza ~30 s de CPU).
+    _emb_modelo = _carregar_modelo_embedding()
+    _emb_e_bl: np.ndarray | None = None
+    _emb_c_bl: np.ndarray | None = None
+    if _emb_modelo is not None:
+        log.info("[blocking] Pré-codificando catálogo + consultas para blocking semântico...")
+        textos_c_bl = catalogo["catmat_processado"].fillna("").tolist()
+        textos_e_bl = consultas["doc_virtual_expandido"].fillna("").tolist()
+        enc_c_bl = [f"passage: {t}" for t in textos_c_bl] if _USA_PREFIXO_E5 else textos_c_bl
+        enc_e_bl = [f"query: {t}" for t in textos_e_bl] if _USA_PREFIXO_E5 else textos_e_bl
+        _emb_c_bl = _emb_modelo.encode(enc_c_bl, batch_size=64, convert_to_numpy=True,
+                                        normalize_embeddings=True, show_progress_bar=False)
+        _emb_e_bl = _emb_modelo.encode(enc_e_bl, batch_size=64, convert_to_numpy=True,
+                                        normalize_embeddings=True, show_progress_bar=False)
+        log.info("[blocking] Embeddings prontos: consultas=%d, catálogo=%d",
+                 len(_emb_e_bl), len(_emb_c_bl))
+        # Guarda no estado para fase_5 reutilizar (sem re-encode)
+        estado["_emb_e"] = _emb_e_bl
+        estado["_emb_c"] = _emb_c_bl
+        estado["_emb_modelo"] = _emb_modelo
+
     candidatos: dict[str, list[int]] = {}
     origens: list[str] = []
     tamanhos: list[int] = []
 
-    for _, row in consultas.iterrows():
+    for pos_e, (_, row) in enumerate(consultas.iterrows()):
         cod_e = row["codigo_efisco"]
         pdm = (row["pdm_ancoragem"] or "").strip().upper()
         classe = (row["classe_efisco"] or "").strip()
@@ -821,6 +919,16 @@ def fase_3_blocking(estado: dict) -> dict:
             cands.update(np.argsort(-sims)[:50].tolist())
             if origem == "sem_candidato":
                 origem = "lexical"
+
+        # 6. Blocking semântico cross-PDM (E5 bi-encoder)
+        # Complementa sempre — captura equivalências que escapam ao PDM idêntico.
+        if _emb_c_bl is not None and _emb_e_bl is not None:
+            q_emb = _emb_e_bl[pos_e]
+            sims_emb = _emb_c_bl @ q_emb
+            top_sem = set(np.argsort(-sims_emb)[:_N_SEM_BLOCKING].tolist())
+            cands.update(top_sem)
+            if cands and origem == "sem_candidato":
+                origem = "embedding"
 
         # Teto por consulta: mantém os mais afins lexicalmente
         if len(cands) > MAX_CANDIDATOS:
@@ -963,7 +1071,7 @@ def fase_4_ontologia(estado: dict) -> dict:
             contagem["incompleto"] += 1
 
     try:
-        onto.salvar(DATA_DIR / "ontologia_mmh.owl")
+        onto.salvar(RESULTADOS_DIR / "ontologia_mmh.owl")
     except Exception as exc:
         log.warning("Falha ao salvar a ontologia: %s", exc)
 
@@ -1046,26 +1154,31 @@ def fase_5_matcher_neural(estado: dict) -> dict:
     textos_e = consultas["doc_virtual_expandido"].fillna("").tolist()
     textos_c = catalogo["catmat_processado"].fillna("").tolist()
 
-    modelo = _carregar_modelo_embedding()
-
-    # --- Estágio 1: bi-encoder assimétrico ---------------------------------
-    if modelo is not None:
-        log.info("Codificando %d consultas + %d itens de catálogo...",
-                 len(textos_e), len(textos_c))
-        enc_e = [f"query: {t}" for t in textos_e] if _USA_PREFIXO_E5 else textos_e
-        enc_c = [f"passage: {t}" for t in textos_c] if _USA_PREFIXO_E5 else textos_c
-        emb_e = modelo.encode(enc_e, batch_size=64, convert_to_numpy=True,
-                              normalize_embeddings=True, show_progress_bar=False)
-        emb_c = modelo.encode(enc_c, batch_size=64, convert_to_numpy=True,
-                              normalize_embeddings=True, show_progress_bar=False)
+    # Reutiliza embeddings pré-computados pela fase [3] (evita re-encode)
+    if "_emb_e" in estado and "_emb_c" in estado:
+        log.info("Reutilizando embeddings E5 pré-computados do blocking (fase [3]).")
+        emb_e = estado["_emb_e"]
+        emb_c = estado["_emb_c"]
+        modelo = estado.get("_emb_modelo")
     else:
-        log.info("Usando TF-IDF como fallback do bi-encoder...")
-        vec = TfidfVectorizer(ngram_range=(1, 2), max_features=20000)
-        vec.fit(textos_e + textos_c)
-        emb_e = vec.transform(textos_e).toarray().astype(np.float32)
-        emb_c = vec.transform(textos_c).toarray().astype(np.float32)
-        emb_e /= (np.linalg.norm(emb_e, axis=1, keepdims=True) + 1e-9)
-        emb_c /= (np.linalg.norm(emb_c, axis=1, keepdims=True) + 1e-9)
+        modelo = _carregar_modelo_embedding()
+        if modelo is not None:
+            log.info("Codificando %d consultas + %d itens de catálogo...",
+                     len(textos_e), len(textos_c))
+            enc_e = [f"query: {t}" for t in textos_e] if _USA_PREFIXO_E5 else textos_e
+            enc_c = [f"passage: {t}" for t in textos_c] if _USA_PREFIXO_E5 else textos_c
+            emb_e = modelo.encode(enc_e, batch_size=64, convert_to_numpy=True,
+                                  normalize_embeddings=True, show_progress_bar=False)
+            emb_c = modelo.encode(enc_c, batch_size=64, convert_to_numpy=True,
+                                  normalize_embeddings=True, show_progress_bar=False)
+        else:
+            log.info("Usando TF-IDF como fallback do bi-encoder...")
+            vec = TfidfVectorizer(ngram_range=(1, 2), max_features=20000)
+            vec.fit(textos_e + textos_c)
+            emb_e = vec.transform(textos_e).toarray().astype(np.float32)
+            emb_c = vec.transform(textos_c).toarray().astype(np.float32)
+            emb_e /= (np.linalg.norm(emb_e, axis=1, keepdims=True) + 1e-9)
+            emb_c /= (np.linalg.norm(emb_c, axis=1, keepdims=True) + 1e-9)
 
     log.info("Estágio 1: pontuando blocos e retendo top-%d por consulta...", K_RERANK)
 
@@ -1146,37 +1259,223 @@ def fase_5_matcher_neural(estado: dict) -> dict:
 
 # ---------------------------------------------------------------------------
 # FASE [6] — GRAPHRAG
-# Papel 2 da §4.2: para o resíduo difícil, em vez de o LLM decidir "no escuro",
-# recupera a vizinhança no grafo e julga com contexto.
+# Implementação completa seguindo a arquitetura GraphRAG (Microsoft/IBM):
+#   Indexação: extração de entidades → grafo de conhecimento bipartito →
+#              detecção de comunidades (Louvain) → resumos de comunidade (LLM)
+#   Busca:     local (vizinhança de entidades no KG) + global (resumo de comunidade)
+#              + contextual (top-3 por vizinho TF-IDF, inclusive matches prováveis)
 # ---------------------------------------------------------------------------
 
-def _adjudicar_graphrag_llm(par: dict, vizinhos: list, client, cache: dict,
-                            model: str = LLM_MODEL_PADRAO) -> dict:
-    """Adjudicação contextual por LLM (§4.2-2). Cache por hash do par."""
+_SW_GRAPHRAG = {
+    "PARA", "COMO", "TIPO", "COM", "SEM", "USO", "CADA", "DEVE",
+    "ESTE", "ESSA", "PRODUTO", "ITEM", "UNIDADE", "CAIXA",
+}
+
+
+def _extrair_entidades_item(texto: str, atributos: dict, pdm: str) -> set:
+    """Entidades de um item: PDM + valores de atributos PDM + tokens relevantes."""
+    entidades: set = set()
+    if pdm:
+        entidades.add(f"PDM::{pdm.upper().strip()}")
+    for k, v in (atributos or {}).items():
+        if v and k != "tipo_produto":
+            entidades.add(f"{k}::{str(v).upper().strip()[:40]}")
+    tokens = [t for t in re.findall(r'[A-ZÀ-Ú]{4,}', texto.upper())
+              if t not in _SW_GRAPHRAG]
+    for t in tokens[:10]:
+        entidades.add(f"TOK::{t}")
+    return entidades
+
+
+def _construir_kg_graphrag(consultas, catalogo):
+    """
+    Grafo de conhecimento bipartito itens ↔ entidades.
+    Nós: 'e:{i}' (e-Fisco), 'c:{j}' (CATMAT), strings de entidade.
+    Returns: G_kg, ents_e {i->set}, ents_c {j->set}
+    """
+    G_kg = nx.Graph()
+    ents_e: dict = {}
+    ents_c: dict = {}
+
+    pdm_col_e = "pdm_ancoragem" if "pdm_ancoragem" in consultas.columns else None
+    pdm_col_c = "pdm" if "pdm" in catalogo.columns else None
+    tem_attr_e = "atributos" in consultas.columns
+    tem_attr_c = "atributos" in catalogo.columns
+
+    for i, row in enumerate(consultas.itertuples(index=False)):
+        pdm = (getattr(row, pdm_col_e, "") or "") if pdm_col_e else ""
+        attr = (getattr(row, "atributos", {}) or {}) if tem_attr_e else {}
+        ents = _extrair_entidades_item(
+            getattr(row, "item_efisco", "") or "", attr, pdm
+        )
+        ents_e[i] = ents
+        node = f"e:{i}"
+        G_kg.add_node(node, tipo="efisco", idx=i)
+        for e in ents:
+            if not G_kg.has_node(e):
+                G_kg.add_node(e, tipo="entidade")
+            G_kg.add_edge(node, e)
+
+    for j, row in enumerate(catalogo.itertuples(index=False)):
+        pdm = (getattr(row, pdm_col_c, "") or "") if pdm_col_c else ""
+        attr = (getattr(row, "atributos", {}) or {}) if tem_attr_c else {}
+        ents = _extrair_entidades_item(
+            getattr(row, "item_catmat", "") or "", attr, pdm
+        )
+        ents_c[j] = ents
+        node = f"c:{j}"
+        G_kg.add_node(node, tipo="catmat", idx=j)
+        for e in ents:
+            if not G_kg.has_node(e):
+                G_kg.add_node(e, tipo="entidade")
+            G_kg.add_edge(node, e)
+
+    return G_kg, ents_e, ents_c
+
+
+def _detectar_comunidades_graphrag(G_kg, n_efisco):
+    """
+    Projeta o KG bipartito para grafo e-Fisco ↔ e-Fisco (itens que compartilham
+    >= 2 entidades), aplica Louvain e retorna {idx_efisco -> community_id}.
+    """
+    G_proj = nx.Graph()
+    G_proj.add_nodes_from(range(n_efisco))
+
+    ent_to_efisco: dict = defaultdict(list)
+    for i in range(n_efisco):
+        node = f"e:{i}"
+        if not G_kg.has_node(node):
+            continue
+        for ent in G_kg.neighbors(node):
+            if G_kg.nodes[ent].get("tipo") == "entidade":
+                ent_to_efisco[ent].append(i)
+
+    for idxs in ent_to_efisco.values():
+        if len(idxs) > 200:   # entidade muito genérica — ignora
+            continue
+        for a in range(len(idxs)):
+            for b in range(a + 1, len(idxs)):
+                ia, ib = idxs[a], idxs[b]
+                if G_proj.has_edge(ia, ib):
+                    G_proj[ia][ib]["peso"] += 1
+                else:
+                    G_proj.add_edge(ia, ib, peso=1)
+
+    G_proj.remove_edges_from(
+        [(u, v) for u, v, d in G_proj.edges(data=True) if d.get("peso", 0) < 2]
+    )
+
+    try:
+        coms = nx.community.louvain_communities(G_proj, seed=42)
+        idx_para_com = {m: cid for cid, membros in enumerate(coms) for m in membros}
+    except Exception:
+        idx_para_com = {i: 0 for i in range(n_efisco)}
+
+    return idx_para_com, G_proj
+
+
+def _resumir_comunidades_graphrag(idx_para_com, consultas, client, cache, model,
+                                   max_comunidades=60):
+    """LLM gera resumo de cada comunidade (busca global). Returns {com_id -> texto}."""
+    resumos: dict = {}
+    if client is None:
+        return resumos
+
+    com_para_idxs: dict = defaultdict(list)
+    for idx, com in idx_para_com.items():
+        com_para_idxs[com].append(idx)
+
+    itens_e = consultas["item_efisco"].fillna("").tolist()
+    coms_por_tamanho = sorted(com_para_idxs.items(), key=lambda x: -len(x[1]))
+
+    for com_id, membros in coms_por_tamanho[:max_comunidades]:
+        if len(membros) < 2:
+            continue
+        samples = [itens_e[i][:90] for i in membros[:5] if i < len(itens_e)]
+        chave_hash = _hash_texto(f"com_resumo_{com_id}_" + "|".join(samples))
+        if chave_hash in cache:
+            resumos[com_id] = cache[chave_hash].get("resumo", "")
+            continue
+        prompt = (
+            "Especialista em materiais medico-hospitalares do Brasil. "
+            "Descreva em UMA frase curta o que esses itens e-Fisco tem em comum "
+            "(produto, material, finalidade):\n"
+            + "\n".join(f"- {s}" for s in samples if s)
+        )
+        try:
+            resp = client.chat.completions.create(
+                model=model, max_tokens=60,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            resumo = (resp.choices[0].message.content or "").strip()
+            cache[chave_hash] = {"resumo": resumo}
+            resumos[com_id] = resumo
+        except Exception:
+            pass
+
+    return resumos
+
+
+def _busca_local_kg(ents_query: set, ents_catmat_all: dict, top_k: int = 6) -> list:
+    """
+    Busca local no KG: CATMATs que compartilham entidades relevantes com a query.
+    Entidades relevantes = atributos PDM e tokens (exclui PDM generico sozinho).
+    Returns: [(idx_cat, n_shared)]
+    """
+    ents_relevantes = {e for e in ents_query if not e.startswith("PDM::")}
+    if not ents_relevantes:
+        ents_relevantes = ents_query
+    scores: dict = {}
+    for j, ents_c in ents_catmat_all.items():
+        n = len(ents_relevantes & ents_c)
+        if n > 0:
+            scores[j] = n
+    return sorted(scores.items(), key=lambda x: -x[1])[:top_k]
+
+
+def _adjudicar_graphrag_llm(par: dict, contexto_local: list, contexto_global: str,
+                             client, cache: dict,
+                             model: str = LLM_MODEL_PADRAO) -> dict:
+    """
+    Adjudicacao por LLM com contexto local (KG + vizinhos TF-IDF) e global (comunidade).
+    Inclui matches provaveis/parciais — nao so os de alta confianca.
+    """
     chave = _hash_texto(par["efisco"] + "||" + par["catmat"])
     if chave in cache:
         return cache[chave]
 
-    linhas_ctx = "".join(
-        f"  - '{str(v['efisco'])[:110]}' ~ '{str(v['catmat'])[:110]}' "
-        f"(score {v['score']:.2f})\n"
-        for v in vizinhos
-    ) or "  (sem vizinhos relevantes)\n"
+    linhas_ctx = ""
+    if contexto_local:
+        linhas_ctx = "Contexto de itens relacionados no grafo de conhecimento:\n"
+        for v in contexto_local[:8]:
+            tipo = v.get("tipo", "vizinho")
+            score_str = (f" (score {v['score']:.2f})" if "score" in v else
+                         (f" ({v['n_entidades']} entidades comuns)" if "n_entidades" in v else ""))
+            linhas_ctx += (
+                f"  [{tipo}] '{str(v['efisco'])[:90]}'"
+                f" ~ '{str(v['catmat'])[:90]}'{score_str}\n"
+            )
+
+    ctx_global = (
+        f"\nFamilia de produtos desta consulta: {contexto_global}"
+        if contexto_global else ""
+    )
 
     prompt = (
-        "Você é um auditor de compras públicas hospitalares (Brasil/MMH) decidindo "
-        "se um item e-Fisco corresponde a um item do catálogo CATMAT. Use o contexto "
-        "de itens semelhantes já avaliados para julgar com contexto — não decida no "
-        "escuro.\n\n"
-        "PAR EM ANÁLISE:\n"
-        f"  e-Fisco: {str(par['efisco'])[:220]}\n"
-        f"  CATMAT : {str(par['catmat'])[:220]}\n"
+        "Voce e um auditor de compras publicas hospitalares (Brasil/MMH). "
+        "Decida se o item e-Fisco corresponde ao item CATMAT abaixo.\n\n"
+        "PAR EM ANALISE:\n"
+        f"  e-Fisco : {str(par['efisco'])[:220]}\n"
+        f"  CATMAT  : {str(par['catmat'])[:220]}\n"
         f"  Score neural: {par['score_neural']:.2f} | "
-        f"Dedução ontológica: {par.get('deducao', '')}\n\n"
-        "CONTEXTO — itens e-Fisco parecidos e o CATMAT que casaram:\n"
-        f"{linhas_ctx}\n"
-        "Decida a confiança (0.0 a 1.0) de que o PAR EM ANÁLISE é equivalente, "
-        "considerando o contexto. Responda APENAS um objeto JSON: "
+        f"Deducao ontologica: {par.get('deducao', 'nenhuma')}"
+        f"{ctx_global}\n\n"
+        + (linhas_ctx or "  (sem contexto de vizinhos)\n")
+        + "\nCriterios:\n"
+        "  - Equivalencia total (mesmo produto e especificacao): 0.75-1.0\n"
+        "  - Match provavel (mesmo produto, especificacao diferente ou ambigua): 0.40-0.74\n"
+        "  - Produtos distintos: < 0.40\n"
+        "Responda APENAS JSON: "
         '{"score": <float 0-1>, "justificativa": "<uma frase>"}'
     )
     resp = client.chat.completions.create(
@@ -1199,15 +1498,21 @@ def _adjudicar_graphrag_llm(par: dict, vizinhos: list, client, cache: dict,
 
 def fase_6_graphrag(estado: dict) -> dict:
     """
-    Fase [6]: adjudicação ancorada no grafo.
+    Fase [6]: GraphRAG via Microsoft GraphRAG (github.com/microsoft/graphrag).
 
-    1. Grafo de similaridade entre CONSULTAS e-Fisco (nós = consultas).
-    2. Para cada consulta cujo melhor candidato caiu na zona cinzenta, recupera
-       consultas vizinhas e o CATMAT que elas casaram com alta confiança.
-    3. O LLM julga com esse contexto; sem LLM, votação da vizinhança.
+    INDEXACAO (uma vez, cached em graphrag_workspace/output/):
+    1. Prepara corpus: um .txt por item (e-Fisco + CATMAT)
+    2. Executa `graphrag index`: extrai entidades, relações, detecta comunidades
+       (Leiden), gera resumos hierárquicos de comunidade via LLM
+    3. Artefatos persistidos em parquet para reutilização
+
+    BUSCA / ADJUDICACAO (por consulta na zona cinzenta):
+    4. graphrag.api.local_search(query=texto_efisco) — recupera entidades
+       vizinhas, relações e resumo de comunidade do KG oficial
+    5. LLM adjudica com o contexto GraphRAG + score neural + dedução OWL
     """
     log.info("=" * 68)
-    log.info("[6] GRAPHRAG — Adjudicação ancorada no grafo")
+    log.info("[6] GRAPHRAG — Microsoft GraphRAG (indexacao + local_search + LLM)")
     log.info("=" * 68)
 
     consultas, catalogo, pares = estado["consultas"], estado["catalogo"], estado["pares"]
@@ -1220,19 +1525,42 @@ def fase_6_graphrag(estado: dict) -> dict:
     pares["score_graphrag"] = pares["score_neural"]
     pares["graphrag_justificativa"] = ""
 
-    # --- Grafo de similaridade entre consultas -----------------------------
-    log.info("Construindo grafo de similaridade entre consultas e-Fisco...")
-    docs = consultas["doc_virtual_expandido"].fillna("").tolist()
-    vec = TfidfVectorizer(ngram_range=(1, 2), max_features=8000)
-    mat = vec.fit_transform(docs)
+    # ------------------------------------------------------------------ #
+    # 1-3. Indexação Microsoft GraphRAG (cached)                          #
+    # ------------------------------------------------------------------ #
+    import graphrag_mmh as gr
+    from pathlib import Path
 
+    client, motivo = _construir_cliente_openai()
+    if client is None:
+        log.warning("[6] LLM indisponivel (%s) — GraphRAG requer API key.", motivo)
+
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    try:
+        gr_config, gr_artefatos = gr.inicializar(consultas, catalogo, api_key)
+        gr_ok = all(v is not None for v in gr_artefatos.values())
+    except Exception as exc:
+        log.warning("[6] GraphRAG inicialização falhou: %s — usando fallback TF-IDF.", exc)
+        gr_ok = False
+        gr_config = gr_artefatos = None
+
+    # ------------------------------------------------------------------ #
+    # 4. Estruturas de consulta                                          #
+    # ------------------------------------------------------------------ #
+    itens_e = consultas["item_efisco"].fillna("").tolist()
+    itens_c = catalogo["item_catmat"].fillna("").tolist()
+
+    melhor = pares.loc[pares.groupby("codigo_efisco")["score_neural"].idxmax()]
+
+    # Grafo TF-IDF como fallback / complemento
+    docs = consultas["doc_virtual_expandido"].fillna("").tolist()
+    vec  = TfidfVectorizer(ngram_range=(1, 2), max_features=8000)
+    mat  = vec.fit_transform(docs)
     G_sim = nx.Graph()
     G_sim.add_nodes_from(range(len(consultas)))
-
-    por_bloco: dict[str, list[int]] = defaultdict(list)
+    por_bloco: dict = defaultdict(list)
     for i, pdm in enumerate(consultas["pdm_ancoragem"].fillna("")):
         por_bloco[pdm or "SEM_PDM"].append(i)
-
     for _, idxs in por_bloco.items():
         if len(idxs) < 2 or len(idxs) > 1500:
             continue
@@ -1240,80 +1568,79 @@ def fase_6_graphrag(estado: dict) -> dict:
         sim = (sub @ sub.T).toarray()
         for a in range(len(idxs)):
             for b in range(a + 1, len(idxs)):
-                if sim[a, b] >= 0.4:
+                if sim[a, b] >= 0.35:
                     G_sim.add_edge(idxs[a], idxs[b], peso=float(sim[a, b]))
 
-    log.info("Grafo de similaridade: %d nós | %d arestas",
-             G_sim.number_of_nodes(), G_sim.number_of_edges())
+    top3_por_consulta: dict = {}
+    for _, grupo in pares.groupby("codigo_efisco"):
+        pos_e = int(grupo["idx_consulta"].iloc[0])
+        top3 = grupo.nlargest(3, "score_neural")
+        top3_por_consulta[pos_e] = [
+            {"idx_catalogo": int(r.idx_catalogo), "score": float(r.score_neural)}
+            for r in top3.itertuples() if r.score_neural >= 0.30
+        ]
 
-    # --- Melhor candidato por consulta -------------------------------------
-    melhor = pares.loc[pares.groupby("codigo_efisco")["score_neural"].idxmax()]
-    melhor_por_consulta = {r.idx_consulta: r for r in melhor.itertuples()}
-
-    client, motivo = _construir_cliente_openai()
-    if client is None:
-        log.warning("[6] LLM indisponível (%s) — adjudicação por votação.", motivo)
+    # ------------------------------------------------------------------ #
+    # 5. Adjudicacao na zona cinzenta                                    #
+    # ------------------------------------------------------------------ #
     cache_adj = _carregar_cache_extracao(_CACHE_GRAPHRAG_PATH) if client else {}
-
-    itens_e = consultas["item_efisco"].fillna("").tolist()
-    itens_c = catalogo["item_catmat"].fillna("").tolist()
-
     zona_baixo, zona_alto = ZONA_CINZENTA
-    alvos = [
-        r for r in melhor.itertuples()
-        if zona_baixo <= r.score_neural < zona_alto
-    ]
-    log.info("Zona cinzenta: %d consultas a adjudicar.", len(alvos))
+    alvos = [r for r in melhor.itertuples()
+             if zona_baixo <= r.score_neural < zona_alto]
+    log.info("[6] Zona cinzenta: %d consultas a adjudicar.", len(alvos))
 
-    ajustes: dict[int, tuple] = {}     # índice da linha em `pares` -> (score, justif)
+    ajustes: dict = {}
     n_llm = n_voto = n_erro = 0
 
     for r in alvos:
         i_cons = r.idx_consulta
+        texto_efisco = itens_e[i_cons]
+
+        # Busca local via Microsoft GraphRAG
+        ctx_gr = ""
+        if gr_ok:
+            ctx_gr = gr.busca_local(gr_config, gr_artefatos, texto_efisco[:300])
+
+        # Fallback: vizinhos TF-IDF top-3
         vizinhos_idx = sorted(
             G_sim[i_cons], key=lambda v: -G_sim[i_cons][v].get("peso", 0)
         )[:5] if i_cons in G_sim else []
-
-        if not vizinhos_idx:
-            continue
-
-        contexto = []
+        contexto_tfidf = []
         for v in vizinhos_idx:
-            mv = melhor_por_consulta.get(v)
-            if mv is None:
-                continue
-            contexto.append({
-                "efisco": itens_e[v],
-                "catmat": itens_c[mv.idx_catalogo],
-                "score": float(mv.score_neural),
-            })
-        if not contexto:
-            continue
+            for cand in top3_por_consulta.get(v, []):
+                j = cand["idx_catalogo"]
+                contexto_tfidf.append({
+                    "tipo": "vizinho_tfidf",
+                    "efisco": itens_e[v],
+                    "catmat": itens_c[j] if j < len(itens_c) else "",
+                    "score": cand["score"],
+                })
 
         veredito = None
         if client is not None and n_llm < LLM_MAX_ADJUDICACOES:
-            par = {
-                "efisco": itens_e[i_cons],
-                "catmat": itens_c[r.idx_catalogo],
+            par_dict = {
+                "efisco": texto_efisco,
+                "catmat": itens_c[r.idx_catalogo] if r.idx_catalogo < len(itens_c) else "",
                 "score_neural": float(r.score_neural),
                 "deducao": deducoes.get(
                     (r.codigo_efisco, r.codigo_catmat), {}).get("deducao", ""),
             }
             try:
-                veredito = _adjudicar_graphrag_llm(par, contexto, client, cache_adj)
+                veredito = _adjudicar_graphrag_llm(
+                    par_dict, contexto_tfidf, ctx_gr,
+                    client, cache_adj, LLM_MODEL_PADRAO
+                )
                 n_llm += 1
             except Exception as exc:
                 n_erro += 1
                 if n_erro <= 3:
-                    log.warning("[6] Adjudicação falhou: %s", str(exc)[:140])
+                    log.warning("[6] Adjudicacao falhou: %s", str(exc)[:140])
 
         if veredito is not None:
             ajustes[r.Index] = (veredito["score"], veredito["justificativa"])
-        else:
-            s_viz = float(np.mean([c["score"] for c in contexto]))
-            ajustes[r.Index] = (
-                min(1.0, 0.6 * float(r.score_neural) + 0.4 * s_viz), ""
-            )
+        elif contexto_tfidf:
+            s_viz = float(np.mean([c["score"] for c in contexto_tfidf]))
+            ajustes[r.Index] = (min(1.0, 0.6 * float(r.score_neural) + 0.4 * s_viz), "")
             n_voto += 1
 
     for idx, (score, justif) in ajustes.items():
@@ -1323,20 +1650,22 @@ def fase_6_graphrag(estado: dict) -> dict:
     if client is not None:
         _salvar_cache_extracao(cache_adj, _CACHE_GRAPHRAG_PATH)
 
-    print("\n=== [6] GRAPHRAG ===")
-    print(f"  Arestas no grafo sim.   : {G_sim.number_of_edges()}")
+    print("\n=== [6] GRAPHRAG (Microsoft GraphRAG) ===")
+    print(f"  Indice GraphRAG         : {'OK' if gr_ok else 'fallback TF-IDF'}")
+    print(f"  Arestas grafo TF-IDF    : {G_sim.number_of_edges()}")
     print(f"  Consultas na zona cinza : {len(alvos)}")
-    print(f"  Adjudicação             : LLM {n_llm} | votação {n_voto}"
+    print(f"  Adjudicacao             : LLM {n_llm} | votacao {n_voto}"
           + (f" | erros {n_erro}" if n_erro else ""))
     if ajustes:
         deltas = [abs(pares.at[i, "score_graphrag"] - pares.at[i, "score_neural"])
                   for i in ajustes]
-        print(f"  Ajuste médio de score   : {np.mean(deltas):.4f}")
+        print(f"  Ajuste medio de score   : {np.mean(deltas):.4f}")
 
     estado.update({
         "pares": pares,
         "grafo_sim": G_sim,
         "stats_fase6": {
+            "graphrag_microsoft": gr_ok,
             "n_arestas_sim": G_sim.number_of_edges(),
             "n_zona_cinzenta": len(alvos),
             "adjudicacao_llm": n_llm,
@@ -1567,7 +1896,7 @@ def fase_7_grafo_unificado(estado: dict) -> dict:
             Gu.add_edge(f"CATMAT_{row['codigo_catmat']}", f"PDM_{pdm}",
                         relacao="mapeadoAoPDM", peso=1.0)
 
-    destino = DATA_DIR / "grafo_unificado.graphml"
+    destino = RESULTADOS_DIR / "grafo_unificado.graphml"
     _xml_invalido = re.compile(r"[^\x09\x0A\x0D\x20-퟿-�]")
 
     Gx = Gu.copy()
@@ -1816,7 +2145,7 @@ def _plotar_analise(estado: dict, tam_comunidades: list) -> None:
     for ax in axes:
         ax.title.set_color("white")
     plt.tight_layout()
-    plt.savefig(DATA_DIR / "analise_global.png", dpi=130, facecolor=fig.get_facecolor())
+    plt.savefig(RESULTADOS_DIR / "analise_global.png", dpi=130, facecolor=fig.get_facecolor())
     plt.close(fig)
 
 
@@ -1836,7 +2165,7 @@ def exportar_resultados(estado: dict) -> None:
         "graphrag_justificativa", "trilha",
     ]
     cols = [c for c in cols if c in pares.columns]
-    pares[cols].to_csv(DATA_DIR / "resultado_pipeline_completo.csv",
+    pares[cols].to_csv(RESULTADOS_DIR / "resultado_pipeline_completo.csv",
                        index=False, sep="|", encoding="utf-8-sig")
 
     stats = {
@@ -1875,7 +2204,7 @@ def exportar_resultados(estado: dict) -> None:
             return float(o)
         return o
 
-    with open(DATA_DIR / "stats_pipeline.json", "w", encoding="utf-8") as fh:
+    with open(RESULTADOS_DIR / "stats_pipeline.json", "w", encoding="utf-8") as fh:
         json.dump(_limpar(stats), fh, ensure_ascii=False, indent=2)
 
     # YAML de apresentação: amostras por faixa de confiança
@@ -1899,7 +2228,7 @@ def exportar_resultados(estado: dict) -> None:
             "duplicatas": estado.get("duplicatas", [])[:20],
             "anomalias_para_curadoria": estado.get("anomalias", [])[:30],
         }
-        with open(DATA_DIR / "resultado_pipeline.yaml", "w", encoding="utf-8") as fh:
+        with open(RESULTADOS_DIR / "resultado_pipeline.yaml", "w", encoding="utf-8") as fh:
             yaml.safe_dump(saida, fh, allow_unicode=True, sort_keys=False)
 
 
@@ -1918,7 +2247,7 @@ def testar_llm_conexao() -> bool:
             model=LLM_MODEL_PADRAO, max_tokens=20,
             response_format={"type": "json_object"},
             messages=[{"role": "user", "content":
-                       'Responda {"ok": true} e nada mais.'}],
+                       'Responda em JSON: {"ok": true} e nada mais.'}],
         )
         print(f"OK — {LLM_MODEL_PADRAO} respondeu: {r.choices[0].message.content}")
         print(f"tokens: {r.usage.prompt_tokens} + {r.usage.completion_tokens}")
@@ -1938,6 +2267,7 @@ def executar_pipeline_completo() -> dict:
     print("=" * 68)
 
     t_inicio = time.time()
+    RESULTADOS_DIR.mkdir(parents=True, exist_ok=True)
 
     with CRONO.medir("fase_0_fontes"):
         estado = fase_0_fontes()
@@ -1968,11 +2298,11 @@ def executar_pipeline_completo() -> dict:
 
     print("\n" + "=" * 68)
     print(f"  PIPELINE CONCLUÍDO em {time.time() - t_inicio:.1f}s")
-    print(f"  Resultado      : resultado_pipeline_completo.csv")
-    print(f"  Métricas       : stats_pipeline.json")
-    print(f"  Grafo unificado: grafo_unificado.graphml")
-    print(f"  Ontologia OWL  : ontologia_mmh.owl")
-    print(f"  Léxico SKOS    : rede_semantica_skos.ttl")
+    print(f"  Resultado      : resultados/resultado_pipeline_completo.csv")
+    print(f"  Métricas       : resultados/stats_pipeline.json")
+    print(f"  Grafo unificado: resultados/grafo_unificado.graphml")
+    print(f"  Ontologia OWL  : resultados/ontologia_mmh.owl")
+    print(f"  Léxico SKOS    : resultados/rede_semantica_skos.ttl")
     print("=" * 68)
     return estado
 
@@ -1984,4 +2314,15 @@ if __name__ == "__main__":
         USAR_LLM = False
     if "--sem-rede" in sys.argv:
         USAR_REDE = False
+    if "--model" in sys.argv:
+        _idx = sys.argv.index("--model")
+        if _idx + 1 < len(sys.argv):
+            LLM_MODEL_PADRAO = sys.argv[_idx + 1]
+            # Redireciona saídas para subpasta isolada por modelo
+            import rede_semantica_mmh as _rsm
+            _slug = LLM_MODEL_PADRAO.replace("/", "-").replace(":", "-")
+            _dir_modelo = DATA_DIR / "resultados" / _slug
+            globals()["RESULTADOS_DIR"] = _dir_modelo
+            _rsm.RESULTADOS_DIR = _dir_modelo
+            print(f"[--model] LLM: {LLM_MODEL_PADRAO} | saída: resultados/{_slug}/")
     executar_pipeline_completo()

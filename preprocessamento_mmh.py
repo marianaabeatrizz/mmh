@@ -41,13 +41,14 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 DATA_DIR = Path(__file__).parent
+DADOS_DIR = DATA_DIR / "dados"
 
 # Arquivos disponíveis na pasta MMH
 ARQUIVOS = {
-    "principal":  DATA_DIR / "20260408_ground_truth_mmh_limpa.csv",
-    "test":       DATA_DIR / "20260408_ground_truth_mmh_test.csv",
-    "opme_test":  DATA_DIR / "20260408_ground_truth_mmh_opme_test.csv",
-    "legado":     DATA_DIR / "20260405_ground_truth_mmh_limpa.csv",
+    "principal":  DADOS_DIR / "20260408_ground_truth_mmh_limpa.csv",
+    "test":       DADOS_DIR / "20260408_ground_truth_mmh_test.csv",
+    "opme_test":  DADOS_DIR / "20260408_ground_truth_mmh_opme_test.csv",
+    "legado":     DADOS_DIR / "20260405_ground_truth_mmh_limpa.csv",
 }
 
 # Padrões de boilerplate jurídico recorrentes nos textos eFisco
