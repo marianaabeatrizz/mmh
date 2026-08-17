@@ -17,7 +17,8 @@ networkx==3.6.1          # grafo léxico, similaridade, comunidades (Louvain)
 
 # --- Camada simbólica ---
 owlready2==0.51          # ontologia OWL + SWRL + reasoner Pellet (requer Java)
-rdflib==7.6.0            # vista SKOS/RDF do léxico (§3.5)
+rdflib==7.6.0            # vista SKOS/RDF do léxico (§3.5) + grafo de dados SHACL (fase [2])
+pyshacl==0.40.1          # validação de esquema PDM (fase [2], Figura 1)
 
 # --- PLN e matching ---
 sentence-transformers==5.5.1   # bi-encoder E5 + cross-encoder mMARCO
@@ -27,6 +28,7 @@ rapidfuzz==3.14.5              # similaridade de string (fallback do estágio 2)
 
 # --- Camada de percepção (LLM) ---
 openai==2.41.1           # extração de atributos e adjudicação GraphRAG
+graphrag>=3.1.1          # Microsoft GraphRAG (fase [6]: indexação + local search)
 
 # --- Serviço (§3.8) ---
 fastapi==0.141.1
