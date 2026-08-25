@@ -1,0 +1,1816 @@
+INFO:
+  DATA: '2026-08-24 23:11:59'
+  ARQUITETURA: pré-proc x processador x pós-proc (pipeline.jpg)
+  METRICA_MATRIZ: mrr
+  TOP_K_CANDIDATOS: 10
+  DADOS:
+    GROUND_TRUTH: 20260408_ground_truth_mmh_limpa.csv
+    N_CONSULTAS: 1012
+    N_CATALOGO: 1054
+    BLOCKING: nenhum — catálogo inteiro por consulta
+  MODULOS:
+    PRE:
+    - ID: nada
+      NOME: Pré-proc 1 (Nada)
+      DESCRICAO: texto cru, sem transformação
+    - ID: basico
+      NOME: Normalização básica
+      DESCRICAO: boilerplate jurídico + sinônimos + stopwords
+    - ID: rede_semantica
+      NOME: Rede semântica
+      DESCRICAO: 'grafo léxico: normalização + propagação de ativação'
+    - ID: graphrag
+      NOME: GraphRAG (expansão por grafo)
+      DESCRICAO: 6 entidades vizinhas no KG + rótulo da comunidade
+    - ID: graphrag_leve
+      NOME: GraphRAG conservador
+      DESCRICAO: 3 entidades vizinhas, sem rótulo de comunidade
+    PROC:
+    - ID: tfidf
+      NOME: TF-IDF (cosseno)
+      DESCRICAO: 1-2 gramas, 20k features
+    - ID: fuzzy
+      NOME: Fuzzy token_set_ratio
+      DESCRICAO: rapidfuzz, casamento léxico
+    - ID: e5
+      NOME: E5 bi-encoder
+      DESCRICAO: intfloat/multilingual-e5-base
+    - ID: e5_cross
+      NOME: E5 + cross-encoder
+      DESCRICAO: intfloat/multilingual-e5-base + cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 (reranking
+        do top-5)
+    POS:
+    - ID: nada
+      NOME: Pós-proc 1 (Nada)
+      DESCRICAO: ranking do processador, sem reordenação
+    - ID: unidades
+      NOME: Equivalência de unidades
+      DESCRICAO: valores + unidades de medida (peso 0.25)
+    - ID: pdm
+      NOME: Coerência de PDM
+      DESCRICAO: família do catálogo vs. consulta (peso 0.25)
+    - ID: graphrag
+      NOME: GraphRAG (reranking por KG)
+      DESCRICAO: cobertura de entidades da consulta (peso 0.25)
+    - ID: unidades_graphrag
+      NOME: Unidades + GraphRAG
+      DESCRICAO: os dois sinais com peso igual (peso 0.25)
+META_PRE:
+  nada:
+    transformacao: nenhuma
+  basico:
+    transformacao: boilerplate + sinônimos + stopwords
+  rede_semantica:
+    transformacao: 'grafo léxico: normalização + ativação'
+    n_nos: 5011
+    n_arestas: 48996
+  graphrag:
+    transformacao: básico + expansão GraphRAG
+    modo: offline
+    n_consultas: 1012
+    n_nos_kg: 6316
+    n_arestas_kg: 27665
+    n_entidades: 4250
+    n_comunidades: 31
+    n_com_rotulo_comunidade: 401
+    media_termos_adicionados: 6.32
+    taxa_expandidas: 0.9901
+  graphrag_leve:
+    transformacao: básico + expansão GraphRAG
+    modo: offline
+    n_consultas: 1012
+    n_nos_kg: 6316
+    n_arestas_kg: 27665
+    n_entidades: 4250
+    n_comunidades: 31
+    n_com_rotulo_comunidade: 0
+    media_termos_adicionados: 2.96
+    taxa_expandidas: 0.9872
+MATRIZ:
+  nada:
+    tfidf: 0.4193
+    fuzzy: 0.3105
+    e5: 0.5234
+    e5_cross: 0.4385
+  basico:
+    tfidf: 0.4765
+    fuzzy: 0.4451
+    e5: 0.5331
+    e5_cross: 0.4112
+  rede_semantica:
+    tfidf: 0.4613
+    fuzzy: 0.4091
+    e5: 0.502
+    e5_cross: 0.3978
+  graphrag:
+    tfidf: 0.4231
+    fuzzy: 0.3891
+    e5: 0.4632
+    e5_cross: 0.373
+  graphrag_leve:
+    tfidf: 0.4392
+    fuzzy: 0.4182
+    e5: 0.4935
+    e5_cross: 0.3852
+RANKING:
+- POSICAO: 1
+  COMBINACAO: nada + e5 + unidades_graphrag
+  PRE: nada
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5622
+    recall_at_1: 0.4387
+    recall_at_3: 0.6522
+    recall_at_5: 0.7223
+    recall_at_10: 0.8182
+    precisao_at_1: 0.4387
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.07
+- POSICAO: 2
+  COMBINACAO: basico + e5 + unidades
+  PRE: basico
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5547
+    recall_at_1: 0.4328
+    recall_at_3: 0.6304
+    recall_at_5: 0.7204
+    recall_at_10: 0.8172
+    precisao_at_1: 0.4328
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.03
+- POSICAO: 3
+  COMBINACAO: basico + e5 + unidades_graphrag
+  PRE: basico
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5532
+    recall_at_1: 0.4279
+    recall_at_3: 0.6344
+    recall_at_5: 0.7204
+    recall_at_10: 0.8172
+    precisao_at_1: 0.4279
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.06
+- POSICAO: 4
+  COMBINACAO: nada + e5 + unidades
+  PRE: nada
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5501
+    recall_at_1: 0.4249
+    recall_at_3: 0.6354
+    recall_at_5: 0.7134
+    recall_at_10: 0.8182
+    precisao_at_1: 0.4249
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.06
+- POSICAO: 5
+  COMBINACAO: basico + e5 + nada
+  PRE: basico
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5331
+    recall_at_1: 0.4101
+    recall_at_3: 0.6067
+    recall_at_5: 0.7105
+    recall_at_10: 0.8172
+    precisao_at_1: 0.4101
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.0
+- POSICAO: 6
+  COMBINACAO: nada + e5 + graphrag
+  PRE: nada
+  PROC: e5
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5322
+    recall_at_1: 0.4061
+    recall_at_3: 0.6136
+    recall_at_5: 0.7026
+    recall_at_10: 0.8182
+    precisao_at_1: 0.4061
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.02
+- POSICAO: 7
+  COMBINACAO: rede_semantica + e5 + unidades_graphrag
+  PRE: rede_semantica
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5272
+    recall_at_1: 0.4081
+    recall_at_3: 0.6077
+    recall_at_5: 0.6848
+    recall_at_10: 0.7846
+    precisao_at_1: 0.4081
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.05
+- POSICAO: 8
+  COMBINACAO: basico + tfidf + unidades_graphrag
+  PRE: basico
+  PROC: tfidf
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5262
+    recall_at_1: 0.4032
+    recall_at_3: 0.6008
+    recall_at_5: 0.6947
+    recall_at_10: 0.8024
+    precisao_at_1: 0.4032
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.23
+    pos: 0.05
+- POSICAO: 9
+  COMBINACAO: nada + e5 + nada
+  PRE: nada
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5234
+    recall_at_1: 0.3962
+    recall_at_3: 0.6038
+    recall_at_5: 0.6966
+    recall_at_10: 0.8182
+    precisao_at_1: 0.3962
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.0
+- POSICAO: 10
+  COMBINACAO: basico + e5 + graphrag
+  PRE: basico
+  PROC: e5
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5231
+    recall_at_1: 0.3982
+    recall_at_3: 0.5939
+    recall_at_5: 0.6947
+    recall_at_10: 0.8172
+    precisao_at_1: 0.3982
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.03
+- POSICAO: 11
+  COMBINACAO: graphrag_leve + e5 + unidades
+  PRE: graphrag_leve
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5211
+    recall_at_1: 0.4061
+    recall_at_3: 0.6038
+    recall_at_5: 0.667
+    recall_at_10: 0.7569
+    precisao_at_1: 0.4061
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.06
+    pos: 0.03
+- POSICAO: 12
+  COMBINACAO: rede_semantica + e5 + unidades
+  PRE: rede_semantica
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5188
+    recall_at_1: 0.4012
+    recall_at_3: 0.5919
+    recall_at_5: 0.6868
+    recall_at_10: 0.7846
+    precisao_at_1: 0.4012
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.04
+- POSICAO: 13
+  COMBINACAO: rede_semantica + tfidf + unidades_graphrag
+  PRE: rede_semantica
+  PROC: tfidf
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5166
+    recall_at_1: 0.3992
+    recall_at_3: 0.5988
+    recall_at_5: 0.6719
+    recall_at_10: 0.7688
+    precisao_at_1: 0.3992
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.26
+    pos: 0.06
+- POSICAO: 14
+  COMBINACAO: basico + tfidf + unidades
+  PRE: basico
+  PROC: tfidf
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5075
+    recall_at_1: 0.3844
+    recall_at_3: 0.5731
+    recall_at_5: 0.665
+    recall_at_10: 0.8024
+    precisao_at_1: 0.3844
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.23
+    pos: 0.03
+- POSICAO: 15
+  COMBINACAO: graphrag_leve + e5 + unidades_graphrag
+  PRE: graphrag_leve
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5063
+    recall_at_1: 0.3864
+    recall_at_3: 0.583
+    recall_at_5: 0.67
+    recall_at_10: 0.7569
+    precisao_at_1: 0.3864
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.06
+    pos: 0.06
+- POSICAO: 16
+  COMBINACAO: rede_semantica + e5 + nada
+  PRE: rede_semantica
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.502
+    recall_at_1: 0.3844
+    recall_at_3: 0.5692
+    recall_at_5: 0.6729
+    recall_at_10: 0.7846
+    precisao_at_1: 0.3844
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.0
+- POSICAO: 17
+  COMBINACAO: rede_semantica + e5 + graphrag
+  PRE: rede_semantica
+  PROC: e5
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.5008
+    recall_at_1: 0.3794
+    recall_at_3: 0.5751
+    recall_at_5: 0.667
+    recall_at_10: 0.7846
+    precisao_at_1: 0.3794
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.02
+- POSICAO: 18
+  COMBINACAO: basico + e5 + pdm
+  PRE: basico
+  PROC: e5
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4977
+    recall_at_1: 0.3656
+    recall_at_3: 0.5652
+    recall_at_5: 0.6838
+    recall_at_10: 0.8172
+    precisao_at_1: 0.3656
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.08
+- POSICAO: 19
+  COMBINACAO: basico + tfidf + graphrag
+  PRE: basico
+  PROC: tfidf
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4976
+    recall_at_1: 0.3686
+    recall_at_3: 0.5741
+    recall_at_5: 0.6729
+    recall_at_10: 0.8024
+    precisao_at_1: 0.3686
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.23
+    pos: 0.02
+- POSICAO: 20
+  COMBINACAO: basico + fuzzy + unidades_graphrag
+  PRE: basico
+  PROC: fuzzy
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4957
+    recall_at_1: 0.3962
+    recall_at_3: 0.5553
+    recall_at_5: 0.6324
+    recall_at_10: 0.7154
+    precisao_at_1: 0.3962
+  TEMPO_S:
+    pre: 0.0
+    proc: 4.38
+    pos: 0.05
+- POSICAO: 21
+  COMBINACAO: rede_semantica + tfidf + unidades
+  PRE: rede_semantica
+  PROC: tfidf
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4937
+    recall_at_1: 0.3735
+    recall_at_3: 0.5692
+    recall_at_5: 0.6522
+    recall_at_10: 0.7688
+    precisao_at_1: 0.3735
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.26
+    pos: 0.04
+- POSICAO: 22
+  COMBINACAO: graphrag_leve + e5 + nada
+  PRE: graphrag_leve
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4935
+    recall_at_1: 0.3794
+    recall_at_3: 0.5613
+    recall_at_5: 0.6453
+    recall_at_10: 0.7569
+    precisao_at_1: 0.3794
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.06
+    pos: 0.0
+- POSICAO: 23
+  COMBINACAO: graphrag + e5 + unidades
+  PRE: graphrag
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4866
+    recall_at_1: 0.3725
+    recall_at_3: 0.5593
+    recall_at_5: 0.6374
+    recall_at_10: 0.7441
+    precisao_at_1: 0.3725
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.07
+    pos: 0.03
+- POSICAO: 24
+  COMBINACAO: rede_semantica + tfidf + graphrag
+  PRE: rede_semantica
+  PROC: tfidf
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4863
+    recall_at_1: 0.3636
+    recall_at_3: 0.5702
+    recall_at_5: 0.6492
+    recall_at_10: 0.7688
+    precisao_at_1: 0.3636
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.26
+    pos: 0.02
+- POSICAO: 25
+  COMBINACAO: rede_semantica + fuzzy + unidades_graphrag
+  PRE: rede_semantica
+  PROC: fuzzy
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4851
+    recall_at_1: 0.3883
+    recall_at_3: 0.5583
+    recall_at_5: 0.6176
+    recall_at_10: 0.6868
+    precisao_at_1: 0.3883
+  TEMPO_S:
+    pre: 0.0
+    proc: 5.01
+    pos: 0.05
+- POSICAO: 26
+  COMBINACAO: nada + e5 + pdm
+  PRE: nada
+  PROC: e5
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4849
+    recall_at_1: 0.3508
+    recall_at_3: 0.5593
+    recall_at_5: 0.665
+    recall_at_10: 0.8182
+    precisao_at_1: 0.3508
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.12
+- POSICAO: 27
+  COMBINACAO: graphrag + e5 + unidades_graphrag
+  PRE: graphrag
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4837
+    recall_at_1: 0.3666
+    recall_at_3: 0.5613
+    recall_at_5: 0.6413
+    recall_at_10: 0.7441
+    precisao_at_1: 0.3666
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.07
+    pos: 0.08
+- POSICAO: 28
+  COMBINACAO: basico + fuzzy + unidades
+  PRE: basico
+  PROC: fuzzy
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4815
+    recall_at_1: 0.3755
+    recall_at_3: 0.5484
+    recall_at_5: 0.6235
+    recall_at_10: 0.7154
+    precisao_at_1: 0.3755
+  TEMPO_S:
+    pre: 0.0
+    proc: 4.38
+    pos: 0.05
+- POSICAO: 29
+  COMBINACAO: nada + e5_cross + unidades_graphrag
+  PRE: nada
+  PROC: e5_cross
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4791
+    recall_at_1: 0.3617
+    recall_at_3: 0.5128
+    recall_at_5: 0.5781
+    recall_at_10: 0.8182
+    precisao_at_1: 0.3617
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.03
+    pos: 0.07
+- POSICAO: 30
+  COMBINACAO: graphrag_leve + tfidf + unidades_graphrag
+  PRE: graphrag_leve
+  PROC: tfidf
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4789
+    recall_at_1: 0.3597
+    recall_at_3: 0.5534
+    recall_at_5: 0.6403
+    recall_at_10: 0.751
+    precisao_at_1: 0.3597
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.28
+    pos: 0.07
+- POSICAO: 31
+  COMBINACAO: rede_semantica + e5 + pdm
+  PRE: rede_semantica
+  PROC: e5
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4781
+    recall_at_1: 0.3498
+    recall_at_3: 0.5553
+    recall_at_5: 0.6621
+    recall_at_10: 0.7846
+    precisao_at_1: 0.3498
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.06
+    pos: 0.12
+- POSICAO: 32
+  COMBINACAO: basico + tfidf + nada
+  PRE: basico
+  PROC: tfidf
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4765
+    recall_at_1: 0.3409
+    recall_at_3: 0.5524
+    recall_at_5: 0.6551
+    recall_at_10: 0.8024
+    precisao_at_1: 0.3409
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.23
+    pos: 0.0
+- POSICAO: 33
+  COMBINACAO: nada + e5_cross + unidades
+  PRE: nada
+  PROC: e5_cross
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4737
+    recall_at_1: 0.3547
+    recall_at_3: 0.5099
+    recall_at_5: 0.5711
+    recall_at_10: 0.8182
+    precisao_at_1: 0.3547
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.03
+    pos: 0.04
+- POSICAO: 34
+  COMBINACAO: basico + fuzzy + graphrag
+  PRE: basico
+  PROC: fuzzy
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4717
+    recall_at_1: 0.3646
+    recall_at_3: 0.5405
+    recall_at_5: 0.6245
+    recall_at_10: 0.7154
+    precisao_at_1: 0.3646
+  TEMPO_S:
+    pre: 0.0
+    proc: 4.38
+    pos: 0.02
+- POSICAO: 35
+  COMBINACAO: graphrag_leve + e5 + graphrag
+  PRE: graphrag_leve
+  PROC: e5
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4695
+    recall_at_1: 0.3478
+    recall_at_3: 0.5356
+    recall_at_5: 0.6413
+    recall_at_10: 0.7569
+    precisao_at_1: 0.3478
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.06
+    pos: 0.02
+- POSICAO: 36
+  COMBINACAO: graphrag_leve + tfidf + unidades
+  PRE: graphrag_leve
+  PROC: tfidf
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4693
+    recall_at_1: 0.3439
+    recall_at_3: 0.5534
+    recall_at_5: 0.6383
+    recall_at_10: 0.751
+    precisao_at_1: 0.3439
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.28
+    pos: 0.04
+- POSICAO: 37
+  COMBINACAO: graphrag_leve + fuzzy + unidades_graphrag
+  PRE: graphrag_leve
+  PROC: fuzzy
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4645
+    recall_at_1: 0.3656
+    recall_at_3: 0.5296
+    recall_at_5: 0.5949
+    recall_at_10: 0.6887
+    precisao_at_1: 0.3656
+  TEMPO_S:
+    pre: 0.03
+    proc: 4.78
+    pos: 0.05
+- POSICAO: 38
+  COMBINACAO: basico + tfidf + pdm
+  PRE: basico
+  PROC: tfidf
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4643
+    recall_at_1: 0.3231
+    recall_at_3: 0.5474
+    recall_at_5: 0.6482
+    recall_at_10: 0.8024
+    precisao_at_1: 0.3231
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.23
+    pos: 0.07
+- POSICAO: 39
+  COMBINACAO: graphrag + e5 + nada
+  PRE: graphrag
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4632
+    recall_at_1: 0.3498
+    recall_at_3: 0.5237
+    recall_at_5: 0.6176
+    recall_at_10: 0.7441
+    precisao_at_1: 0.3498
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.07
+    pos: 0.0
+- POSICAO: 40
+  COMBINACAO: rede_semantica + tfidf + nada
+  PRE: rede_semantica
+  PROC: tfidf
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4613
+    recall_at_1: 0.332
+    recall_at_3: 0.5425
+    recall_at_5: 0.6344
+    recall_at_10: 0.7688
+    precisao_at_1: 0.332
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.26
+    pos: 0.0
+- POSICAO: 41
+  COMBINACAO: nada + tfidf + unidades_graphrag
+  PRE: nada
+  PROC: tfidf
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4583
+    recall_at_1: 0.3478
+    recall_at_3: 0.5296
+    recall_at_5: 0.6077
+    recall_at_10: 0.6996
+    precisao_at_1: 0.3478
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.36
+    pos: 0.07
+- POSICAO: 42
+  COMBINACAO: nada + e5_cross + graphrag
+  PRE: nada
+  PROC: e5_cross
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4559
+    recall_at_1: 0.3419
+    recall_at_3: 0.4773
+    recall_at_5: 0.5484
+    recall_at_10: 0.8182
+    precisao_at_1: 0.3419
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.03
+    pos: 0.02
+- POSICAO: 43
+  COMBINACAO: rede_semantica + fuzzy + graphrag
+  PRE: rede_semantica
+  PROC: fuzzy
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4551
+    recall_at_1: 0.3478
+    recall_at_3: 0.5316
+    recall_at_5: 0.6067
+    recall_at_10: 0.6868
+    precisao_at_1: 0.3478
+  TEMPO_S:
+    pre: 0.0
+    proc: 5.01
+    pos: 0.02
+- POSICAO: 44
+  COMBINACAO: graphrag + e5 + graphrag
+  PRE: graphrag
+  PROC: e5
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4541
+    recall_at_1: 0.3379
+    recall_at_3: 0.5168
+    recall_at_5: 0.6087
+    recall_at_10: 0.7441
+    precisao_at_1: 0.3379
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.07
+    pos: 0.02
+- POSICAO: 45
+  COMBINACAO: graphrag_leve + fuzzy + unidades
+  PRE: graphrag_leve
+  PROC: fuzzy
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4538
+    recall_at_1: 0.3449
+    recall_at_3: 0.5237
+    recall_at_5: 0.5899
+    recall_at_10: 0.6887
+    precisao_at_1: 0.3449
+  TEMPO_S:
+    pre: 0.03
+    proc: 4.78
+    pos: 0.06
+- POSICAO: 46
+  COMBINACAO: nada + tfidf + unidades
+  PRE: nada
+  PROC: tfidf
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4524
+    recall_at_1: 0.3439
+    recall_at_3: 0.5188
+    recall_at_5: 0.5968
+    recall_at_10: 0.6996
+    precisao_at_1: 0.3439
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.36
+    pos: 0.04
+- POSICAO: 47
+  COMBINACAO: basico + fuzzy + pdm
+  PRE: basico
+  PROC: fuzzy
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4516
+    recall_at_1: 0.3399
+    recall_at_3: 0.5178
+    recall_at_5: 0.6067
+    recall_at_10: 0.7154
+    precisao_at_1: 0.3399
+  TEMPO_S:
+    pre: 0.0
+    proc: 4.38
+    pos: 0.09
+- POSICAO: 48
+  COMBINACAO: graphrag + tfidf + unidades
+  PRE: graphrag
+  PROC: tfidf
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4514
+    recall_at_1: 0.3271
+    recall_at_3: 0.5287
+    recall_at_5: 0.6186
+    recall_at_10: 0.7292
+    precisao_at_1: 0.3271
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.27
+    pos: 0.03
+- POSICAO: 49
+  COMBINACAO: graphrag + tfidf + unidades_graphrag
+  PRE: graphrag
+  PROC: tfidf
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4512
+    recall_at_1: 0.331
+    recall_at_3: 0.5198
+    recall_at_5: 0.6107
+    recall_at_10: 0.7292
+    precisao_at_1: 0.331
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.27
+    pos: 0.07
+- POSICAO: 50
+  COMBINACAO: rede_semantica + fuzzy + unidades
+  PRE: rede_semantica
+  PROC: fuzzy
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4509
+    recall_at_1: 0.3528
+    recall_at_3: 0.5089
+    recall_at_5: 0.5791
+    recall_at_10: 0.6868
+    precisao_at_1: 0.3528
+  TEMPO_S:
+    pre: 0.0
+    proc: 5.01
+    pos: 0.06
+- POSICAO: 51
+  COMBINACAO: basico + e5_cross + unidades_graphrag
+  PRE: basico
+  PROC: e5_cross
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4494
+    recall_at_1: 0.333
+    recall_at_3: 0.4644
+    recall_at_5: 0.5306
+    recall_at_10: 0.8172
+    precisao_at_1: 0.333
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.03
+    pos: 0.05
+- POSICAO: 52
+  COMBINACAO: nada + e5_cross + pdm
+  PRE: nada
+  PROC: e5_cross
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.448
+    recall_at_1: 0.3241
+    recall_at_3: 0.4872
+    recall_at_5: 0.5761
+    recall_at_10: 0.8182
+    precisao_at_1: 0.3241
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.03
+    pos: 0.09
+- POSICAO: 53
+  COMBINACAO: rede_semantica + tfidf + pdm
+  PRE: rede_semantica
+  PROC: tfidf
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4476
+    recall_at_1: 0.3132
+    recall_at_3: 0.5306
+    recall_at_5: 0.6285
+    recall_at_10: 0.7688
+    precisao_at_1: 0.3132
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.26
+    pos: 0.1
+- POSICAO: 54
+  COMBINACAO: basico + e5_cross + unidades
+  PRE: basico
+  PROC: e5_cross
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4458
+    recall_at_1: 0.3281
+    recall_at_3: 0.4625
+    recall_at_5: 0.5178
+    recall_at_10: 0.8172
+    precisao_at_1: 0.3281
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.03
+    pos: 0.03
+- POSICAO: 55
+  COMBINACAO: basico + fuzzy + nada
+  PRE: basico
+  PROC: fuzzy
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4451
+    recall_at_1: 0.3281
+    recall_at_3: 0.5148
+    recall_at_5: 0.6038
+    recall_at_10: 0.7154
+    precisao_at_1: 0.3281
+  TEMPO_S:
+    pre: 0.0
+    proc: 4.38
+    pos: 0.0
+- POSICAO: 56
+  COMBINACAO: graphrag_leve + tfidf + graphrag
+  PRE: graphrag_leve
+  PROC: tfidf
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4417
+    recall_at_1: 0.3172
+    recall_at_3: 0.5119
+    recall_at_5: 0.6047
+    recall_at_10: 0.751
+    precisao_at_1: 0.3172
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.28
+    pos: 0.04
+- POSICAO: 57
+  COMBINACAO: graphrag_leve + e5 + pdm
+  PRE: graphrag_leve
+  PROC: e5
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4405
+    recall_at_1: 0.3152
+    recall_at_3: 0.502
+    recall_at_5: 0.6107
+    recall_at_10: 0.7569
+    precisao_at_1: 0.3152
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.06
+    pos: 0.08
+- POSICAO: 58
+  COMBINACAO: graphrag_leve + fuzzy + graphrag
+  PRE: graphrag_leve
+  PROC: fuzzy
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4393
+    recall_at_1: 0.33
+    recall_at_3: 0.5069
+    recall_at_5: 0.586
+    recall_at_10: 0.6887
+    precisao_at_1: 0.33
+  TEMPO_S:
+    pre: 0.03
+    proc: 4.78
+    pos: 0.02
+- POSICAO: 59
+  COMBINACAO: graphrag_leve + tfidf + nada
+  PRE: graphrag_leve
+  PROC: tfidf
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4392
+    recall_at_1: 0.3043
+    recall_at_3: 0.5237
+    recall_at_5: 0.6176
+    recall_at_10: 0.751
+    precisao_at_1: 0.3043
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.28
+    pos: 0.0
+- POSICAO: 60
+  COMBINACAO: rede_semantica + e5_cross + unidades_graphrag
+  PRE: rede_semantica
+  PROC: e5_cross
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4391
+    recall_at_1: 0.331
+    recall_at_3: 0.4536
+    recall_at_5: 0.5168
+    recall_at_10: 0.7846
+    precisao_at_1: 0.331
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.04
+    pos: 0.06
+- POSICAO: 61
+  COMBINACAO: nada + e5_cross + nada
+  PRE: nada
+  PROC: e5_cross
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4385
+    recall_at_1: 0.3231
+    recall_at_3: 0.4526
+    recall_at_5: 0.5208
+    recall_at_10: 0.8182
+    precisao_at_1: 0.3231
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.03
+    pos: 0.0
+- POSICAO: 62
+  COMBINACAO: graphrag + fuzzy + unidades_graphrag
+  PRE: graphrag
+  PROC: fuzzy
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4332
+    recall_at_1: 0.3389
+    recall_at_3: 0.498
+    recall_at_5: 0.5514
+    recall_at_10: 0.6472
+    precisao_at_1: 0.3389
+  TEMPO_S:
+    pre: 0.02
+    proc: 4.88
+    pos: 0.06
+- POSICAO: 63
+  COMBINACAO: graphrag + fuzzy + unidades
+  PRE: graphrag
+  PROC: fuzzy
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4297
+    recall_at_1: 0.337
+    recall_at_3: 0.4862
+    recall_at_5: 0.5514
+    recall_at_10: 0.6472
+    precisao_at_1: 0.337
+  TEMPO_S:
+    pre: 0.02
+    proc: 4.88
+    pos: 0.05
+- POSICAO: 64
+  COMBINACAO: basico + e5_cross + graphrag
+  PRE: basico
+  PROC: e5_cross
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4287
+    recall_at_1: 0.3123
+    recall_at_3: 0.4417
+    recall_at_5: 0.5109
+    recall_at_10: 0.8172
+    precisao_at_1: 0.3123
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.03
+    pos: 0.02
+- POSICAO: 65
+  COMBINACAO: rede_semantica + e5_cross + unidades
+  PRE: rede_semantica
+  PROC: e5_cross
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4279
+    recall_at_1: 0.3142
+    recall_at_3: 0.4466
+    recall_at_5: 0.5059
+    recall_at_10: 0.7846
+    precisao_at_1: 0.3142
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.04
+    pos: 0.03
+- POSICAO: 66
+  COMBINACAO: rede_semantica + fuzzy + pdm
+  PRE: rede_semantica
+  PROC: fuzzy
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4259
+    recall_at_1: 0.3221
+    recall_at_3: 0.4822
+    recall_at_5: 0.5721
+    recall_at_10: 0.6868
+    precisao_at_1: 0.3221
+  TEMPO_S:
+    pre: 0.0
+    proc: 5.01
+    pos: 0.09
+- POSICAO: 67
+  COMBINACAO: graphrag_leve + e5_cross + unidades_graphrag
+  PRE: graphrag_leve
+  PROC: e5_cross
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4252
+    recall_at_1: 0.3172
+    recall_at_3: 0.4447
+    recall_at_5: 0.5138
+    recall_at_10: 0.7569
+    precisao_at_1: 0.3172
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.03
+    pos: 0.05
+- POSICAO: 68
+  COMBINACAO: graphrag + tfidf + nada
+  PRE: graphrag
+  PROC: tfidf
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4231
+    recall_at_1: 0.2945
+    recall_at_3: 0.497
+    recall_at_5: 0.5909
+    recall_at_10: 0.7292
+    precisao_at_1: 0.2945
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.27
+    pos: 0.0
+- POSICAO: 69
+  COMBINACAO: nada + tfidf + graphrag
+  PRE: nada
+  PROC: tfidf
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4204
+    recall_at_1: 0.3014
+    recall_at_3: 0.4921
+    recall_at_5: 0.5771
+    recall_at_10: 0.6996
+    precisao_at_1: 0.3014
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.36
+    pos: 1.2
+- POSICAO: 70
+  COMBINACAO: nada + tfidf + nada
+  PRE: nada
+  PROC: tfidf
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4193
+    recall_at_1: 0.2984
+    recall_at_3: 0.496
+    recall_at_5: 0.5771
+    recall_at_10: 0.6996
+    precisao_at_1: 0.2984
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.36
+    pos: 0.0
+- POSICAO: 71
+  COMBINACAO: basico + e5_cross + pdm
+  PRE: basico
+  PROC: e5_cross
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4186
+    recall_at_1: 0.2885
+    recall_at_3: 0.4457
+    recall_at_5: 0.5563
+    recall_at_10: 0.8172
+    precisao_at_1: 0.2885
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.03
+    pos: 0.07
+- POSICAO: 72
+  COMBINACAO: graphrag_leve + fuzzy + nada
+  PRE: graphrag_leve
+  PROC: fuzzy
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4182
+    recall_at_1: 0.2984
+    recall_at_3: 0.4901
+    recall_at_5: 0.5751
+    recall_at_10: 0.6887
+    precisao_at_1: 0.2984
+  TEMPO_S:
+    pre: 0.03
+    proc: 4.78
+    pos: 0.0
+- POSICAO: 73
+  COMBINACAO: graphrag_leve + e5_cross + unidades
+  PRE: graphrag_leve
+  PROC: e5_cross
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.418
+    recall_at_1: 0.3073
+    recall_at_3: 0.4427
+    recall_at_5: 0.497
+    recall_at_10: 0.7569
+    precisao_at_1: 0.3073
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.03
+    pos: 0.05
+- POSICAO: 74
+  COMBINACAO: graphrag + tfidf + graphrag
+  PRE: graphrag
+  PROC: tfidf
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4173
+    recall_at_1: 0.2955
+    recall_at_3: 0.4773
+    recall_at_5: 0.5741
+    recall_at_10: 0.7292
+    precisao_at_1: 0.2955
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.27
+    pos: 0.03
+- POSICAO: 75
+  COMBINACAO: rede_semantica + e5_cross + graphrag
+  PRE: rede_semantica
+  PROC: e5_cross
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4148
+    recall_at_1: 0.3043
+    recall_at_3: 0.4249
+    recall_at_5: 0.504
+    recall_at_10: 0.7846
+    precisao_at_1: 0.3043
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.04
+    pos: 0.02
+- POSICAO: 76
+  COMBINACAO: graphrag + e5_cross + unidades_graphrag
+  PRE: graphrag
+  PROC: e5_cross
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4146
+    recall_at_1: 0.3034
+    recall_at_3: 0.4466
+    recall_at_5: 0.5069
+    recall_at_10: 0.7441
+    precisao_at_1: 0.3034
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.03
+    pos: 0.06
+- POSICAO: 77
+  COMBINACAO: graphrag_leve + fuzzy + pdm
+  PRE: graphrag_leve
+  PROC: fuzzy
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4131
+    recall_at_1: 0.3014
+    recall_at_3: 0.4713
+    recall_at_5: 0.5573
+    recall_at_10: 0.6887
+    precisao_at_1: 0.3014
+  TEMPO_S:
+    pre: 0.03
+    proc: 4.78
+    pos: 0.1
+- POSICAO: 78
+  COMBINACAO: graphrag + e5 + pdm
+  PRE: graphrag
+  PROC: e5
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4114
+    recall_at_1: 0.2905
+    recall_at_3: 0.4634
+    recall_at_5: 0.5711
+    recall_at_10: 0.7441
+    precisao_at_1: 0.2905
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.07
+    pos: 0.09
+- POSICAO: 79
+  COMBINACAO: basico + e5_cross + nada
+  PRE: basico
+  PROC: e5_cross
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4112
+    recall_at_1: 0.2945
+    recall_at_3: 0.414
+    recall_at_5: 0.4713
+    recall_at_10: 0.8172
+    precisao_at_1: 0.2945
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.03
+    pos: 0.0
+- POSICAO: 80
+  COMBINACAO: rede_semantica + e5_cross + pdm
+  PRE: rede_semantica
+  PROC: e5_cross
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4099
+    recall_at_1: 0.2836
+    recall_at_3: 0.4437
+    recall_at_5: 0.5524
+    recall_at_10: 0.7846
+    precisao_at_1: 0.2836
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.04
+    pos: 0.08
+- POSICAO: 81
+  COMBINACAO: rede_semantica + fuzzy + nada
+  PRE: rede_semantica
+  PROC: fuzzy
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4091
+    recall_at_1: 0.2974
+    recall_at_3: 0.4674
+    recall_at_5: 0.5623
+    recall_at_10: 0.6868
+    precisao_at_1: 0.2974
+  TEMPO_S:
+    pre: 0.0
+    proc: 5.01
+    pos: 0.0
+- POSICAO: 82
+  COMBINACAO: graphrag + e5_cross + unidades
+  PRE: graphrag
+  PROC: e5_cross
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4082
+    recall_at_1: 0.2964
+    recall_at_3: 0.4358
+    recall_at_5: 0.498
+    recall_at_10: 0.7441
+    precisao_at_1: 0.2964
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.03
+    pos: 0.03
+- POSICAO: 83
+  COMBINACAO: nada + tfidf + pdm
+  PRE: nada
+  PROC: tfidf
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4054
+    recall_at_1: 0.2806
+    recall_at_3: 0.4872
+    recall_at_5: 0.5672
+    recall_at_10: 0.6996
+    precisao_at_1: 0.2806
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.36
+    pos: 0.09
+- POSICAO: 84
+  COMBINACAO: graphrag_leve + tfidf + pdm
+  PRE: graphrag_leve
+  PROC: tfidf
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4049
+    recall_at_1: 0.2737
+    recall_at_3: 0.4664
+    recall_at_5: 0.5761
+    recall_at_10: 0.751
+    precisao_at_1: 0.2737
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.28
+    pos: 0.13
+- POSICAO: 85
+  COMBINACAO: graphrag + fuzzy + graphrag
+  PRE: graphrag
+  PROC: fuzzy
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4032
+    recall_at_1: 0.3034
+    recall_at_3: 0.4595
+    recall_at_5: 0.5346
+    recall_at_10: 0.6472
+    precisao_at_1: 0.3034
+  TEMPO_S:
+    pre: 0.02
+    proc: 4.88
+    pos: 0.02
+- POSICAO: 86
+  COMBINACAO: graphrag_leve + e5_cross + graphrag
+  PRE: graphrag_leve
+  PROC: e5_cross
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.4004
+    recall_at_1: 0.2866
+    recall_at_3: 0.4219
+    recall_at_5: 0.504
+    recall_at_10: 0.7569
+    precisao_at_1: 0.2866
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.03
+    pos: 0.02
+- POSICAO: 87
+  COMBINACAO: rede_semantica + e5_cross + nada
+  PRE: rede_semantica
+  PROC: e5_cross
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3978
+    recall_at_1: 0.2866
+    recall_at_3: 0.3992
+    recall_at_5: 0.4615
+    recall_at_10: 0.7846
+    precisao_at_1: 0.2866
+  TEMPO_S:
+    pre: 0.0
+    proc: 0.04
+    pos: 0.0
+- POSICAO: 88
+  COMBINACAO: graphrag_leve + e5_cross + pdm
+  PRE: graphrag_leve
+  PROC: e5_cross
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3917
+    recall_at_1: 0.2638
+    recall_at_3: 0.4358
+    recall_at_5: 0.5375
+    recall_at_10: 0.7569
+    precisao_at_1: 0.2638
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.03
+    pos: 0.09
+- POSICAO: 89
+  COMBINACAO: graphrag + fuzzy + nada
+  PRE: graphrag
+  PROC: fuzzy
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3891
+    recall_at_1: 0.2856
+    recall_at_3: 0.4486
+    recall_at_5: 0.5326
+    recall_at_10: 0.6472
+    precisao_at_1: 0.2856
+  TEMPO_S:
+    pre: 0.02
+    proc: 4.88
+    pos: 0.0
+- POSICAO: 90
+  COMBINACAO: graphrag_leve + e5_cross + nada
+  PRE: graphrag_leve
+  PROC: e5_cross
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3852
+    recall_at_1: 0.2727
+    recall_at_3: 0.3992
+    recall_at_5: 0.4625
+    recall_at_10: 0.7569
+    precisao_at_1: 0.2727
+  TEMPO_S:
+    pre: 0.03
+    proc: 0.03
+    pos: 0.0
+- POSICAO: 91
+  COMBINACAO: graphrag + e5_cross + graphrag
+  PRE: graphrag
+  PROC: e5_cross
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3839
+    recall_at_1: 0.2658
+    recall_at_3: 0.413
+    recall_at_5: 0.4951
+    recall_at_10: 0.7441
+    precisao_at_1: 0.2658
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.03
+    pos: 0.02
+- POSICAO: 92
+  COMBINACAO: graphrag + fuzzy + pdm
+  PRE: graphrag
+  PROC: fuzzy
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3798
+    recall_at_1: 0.2787
+    recall_at_3: 0.4358
+    recall_at_5: 0.5099
+    recall_at_10: 0.6472
+    precisao_at_1: 0.2787
+  TEMPO_S:
+    pre: 0.02
+    proc: 4.88
+    pos: 0.13
+- POSICAO: 93
+  COMBINACAO: graphrag + tfidf + pdm
+  PRE: graphrag
+  PROC: tfidf
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3765
+    recall_at_1: 0.252
+    recall_at_3: 0.4239
+    recall_at_5: 0.5247
+    recall_at_10: 0.7292
+    precisao_at_1: 0.252
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.27
+    pos: 0.16
+- POSICAO: 94
+  COMBINACAO: nada + fuzzy + unidades_graphrag
+  PRE: nada
+  PROC: fuzzy
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3741
+    recall_at_1: 0.2836
+    recall_at_3: 0.4427
+    recall_at_5: 0.4951
+    recall_at_10: 0.5494
+    precisao_at_1: 0.2836
+  TEMPO_S:
+    pre: 0.01
+    proc: 7.12
+    pos: 0.06
+- POSICAO: 95
+  COMBINACAO: graphrag + e5_cross + nada
+  PRE: graphrag
+  PROC: e5_cross
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.373
+    recall_at_1: 0.2559
+    recall_at_3: 0.3903
+    recall_at_5: 0.4625
+    recall_at_10: 0.7441
+    precisao_at_1: 0.2559
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.03
+    pos: 0.0
+- POSICAO: 96
+  COMBINACAO: graphrag + e5_cross + pdm
+  PRE: graphrag
+  PROC: e5_cross
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3668
+    recall_at_1: 0.2381
+    recall_at_3: 0.3992
+    recall_at_5: 0.5188
+    recall_at_10: 0.7441
+    precisao_at_1: 0.2381
+  TEMPO_S:
+    pre: 0.02
+    proc: 0.03
+    pos: 0.09
+- POSICAO: 97
+  COMBINACAO: nada + fuzzy + graphrag
+  PRE: nada
+  PROC: fuzzy
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.359
+    recall_at_1: 0.2668
+    recall_at_3: 0.4219
+    recall_at_5: 0.4852
+    recall_at_10: 0.5494
+    precisao_at_1: 0.2668
+  TEMPO_S:
+    pre: 0.01
+    proc: 7.12
+    pos: 0.02
+- POSICAO: 98
+  COMBINACAO: nada + fuzzy + unidades
+  PRE: nada
+  PROC: fuzzy
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3415
+    recall_at_1: 0.251
+    recall_at_3: 0.3962
+    recall_at_5: 0.4545
+    recall_at_10: 0.5494
+    precisao_at_1: 0.251
+  TEMPO_S:
+    pre: 0.01
+    proc: 7.12
+    pos: 0.06
+- POSICAO: 99
+  COMBINACAO: nada + fuzzy + pdm
+  PRE: nada
+  PROC: fuzzy
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3292
+    recall_at_1: 0.2322
+    recall_at_3: 0.3883
+    recall_at_5: 0.4605
+    recall_at_10: 0.5494
+    precisao_at_1: 0.2322
+  TEMPO_S:
+    pre: 0.01
+    proc: 7.12
+    pos: 0.1
+- POSICAO: 100
+  COMBINACAO: nada + fuzzy + nada
+  PRE: nada
+  PROC: fuzzy
+  POS: nada
+  METRICAS:
+    n_avaliados: 1012
+    mrr: 0.3105
+    recall_at_1: 0.2144
+    recall_at_3: 0.3597
+    recall_at_5: 0.4338
+    recall_at_10: 0.5494
+    precisao_at_1: 0.2144
+  TEMPO_S:
+    pre: 0.01
+    proc: 7.12
+    pos: 0.0
+SEM_VALOR: []
