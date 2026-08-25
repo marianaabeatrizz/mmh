@@ -187,6 +187,160 @@ O blocking semântico por embedding foi a melhoria de maior impacto no pipeline:
 
 ---
 
+## Grade modular — pré-processador × processador × pós-processador
+
+O pipeline das fases [0]–[9] executa **uma** configuração fixa. A grade modular
+(`avaliacao_modular_mmh.py`) transforma cada etapa em módulo trocável e mede
+**todas as combinações** lado a lado, produzindo a matriz e o ranking:
+
+```
+Pré-proc 1 (Nada) ┐                              ┌ Pós-proc 1 (Nada) ┐
+Pré-proc 2        ├─→ Processador 1..N ─→ matriz ─→ Pós-proc 2       ├─→ Rank das
+Pré-proc N        ┘      (pré × proc)            └ Pós-proc N        ┘   combinações
+```
+
+Sem blocking: cada consulta é pontuada contra o catálogo CATMAT inteiro, então o
+teto é 100% e as células são comparáveis entre si. Os pós-processadores só
+reordenam o top-K de cada célula.
+
+### Módulos
+
+| Eixo | ID | O que faz |
+|---|---|---|
+| Pré | `nada` | texto cru, sem transformação |
+| Pré | `basico` | boilerplate jurídico + sinônimos + stopwords |
+| Pré | `rede_semantica` | grafo léxico: normalização + propagação de ativação (fase [1]) |
+| Pré | `graphrag` | **GraphRAG**: 6 entidades vizinhas no KG + rótulo da comunidade |
+| Pré | `graphrag_leve` | **GraphRAG** conservador: 3 entidades, sem rótulo de comunidade |
+| Proc | `tfidf` | cosseno sobre TF-IDF de 1-2 gramas |
+| Proc | `fuzzy` | `token_set_ratio` (rapidfuzz) |
+| Proc | `e5` | bi-encoder assimétrico `multilingual-e5-base` |
+| Proc | `e5_cross` | E5 + cross-encoder mMARCO reranqueando o top-5 |
+| Pós | `nada` | mantém o ranking do processador |
+| Pós | `unidades` | equivalência de valores e unidades de medida (18G, 3 ML, 40 MM) |
+| Pós | `pdm` | coerência de família PDM entre candidato e consulta |
+| Pós | `graphrag` | **GraphRAG**: cobertura das entidades da consulta pelo candidato, no mesmo KG |
+| Pós | `unidades_graphrag` | os dois sinais acima com peso igual |
+
+> O GraphRAG aparece em **dois eixos**, sobre o mesmo KG (entidades de
+> PDM/atributos/tokens, busca local por sobreposição, comunidades Louvain):
+> como **pré-processador**, reescrevendo a consulta como documento virtual
+> expandido antes da similaridade; e como **pós-processador**, reordenando o
+> top-K pela cobertura das entidades da consulta. O modo offline não custa API;
+> `--graphrag-ms` usa o índice oficial da Microsoft na expansão.
+>
+> KG construído sobre o corpus: **6 316 nós, 27 665 arestas, 4 250 entidades,
+> 31 comunidades**. A expansão acrescenta em média **6,32 termos** por consulta
+> e alcança **99%** delas (variante conservadora: 2,96 termos).
+
+### Matriz pré × proc (MRR, 1 012 consultas × 1 054 itens, sem pós-processamento)
+
+| pré \ proc | tfidf | fuzzy | e5 | e5_cross |
+|---|---|---|---|---|
+| `nada` | 0,4193 | 0,3105 | **0,5234** | 0,4385 |
+| `basico` | 0,4765 | 0,4451 | **0,5331** | 0,4112 |
+| `rede_semantica` | 0,4613 | 0,4091 | 0,5020 | 0,3978 |
+| `graphrag` | 0,4231 | 0,3891 | 0,4632 | 0,3730 |
+| `graphrag_leve` | 0,4392 | 0,4182 | 0,4935 | 0,3852 |
+
+Visualização em `resultados/matriz_modular.png`.
+
+### Rank das melhores combinações
+
+| # | combinação | MRR | R@1 | R@3 | R@10 |
+|---|---|---|---|---|---|
+| 1 | `nada` + `e5` + `unidades_graphrag` | **0,5622** | 43,9% | 65,2% | 81,8% |
+| 2 | `basico` + `e5` + `unidades` | 0,5547 | 43,3% | 63,0% | 81,7% |
+| 3 | `basico` + `e5` + `unidades_graphrag` | 0,5532 | 42,8% | 63,4% | 81,7% |
+| 4 | `nada` + `e5` + `unidades` | 0,5501 | 42,5% | 63,5% | 81,8% |
+| 5 | `basico` + `e5` + `nada` | 0,5331 | 41,0% | 60,7% | 81,7% |
+| 6 | `nada` + `e5` + `graphrag` | 0,5322 | 40,6% | 61,4% | 81,8% |
+| 7 | `rede_semantica` + `e5` + `unidades_graphrag` | 0,5272 | 40,8% | 60,8% | 78,5% |
+
+As 100 combinações completas estão em `resultados/avaliacao_modular.yaml` e
+`resultados/ranking_combinacoes.csv`.
+
+### Leitura dos resultados
+
+1. **O processador domina o resultado.** O E5 abre ~0,06 MRR sobre o TF-IDF na
+   melhor linha e ~0,21 sobre o fuzzy na pior. A escolha do processador pesa
+   mais que a de qualquer pré-processador.
+
+2. **Pós-processadores de atributo ajudam; o de família atrapalha.** `unidades`
+   ganha +0,02 a +0,04 MRR em todas as 20 células. O `graphrag` (cobertura de
+   entidades) ajuda em **15 das 20**, com o ganho concentrado onde o processador
+   é fraco (+0,049 em `nada`+`fuzzy`, +0,027 em `basico`+`fuzzy`) e uma perda
+   pequena nas células já fortes (−0,010 em `basico`+`e5`). Os dois somados dão
+   o **melhor resultado da grade** (0,5622). Já o `pdm` **piora** (−0,03 no
+   melhor caso): a família já está embutida no texto, e o bônus acaba premiando
+   candidatos genéricos da família certa.
+
+3. **O mesmo grafo vale mais depois do que antes.** Como *pré*-processador, a
+   expansão GraphRAG custa −0,07 MRR frente à normalização básica (0,4632 vs
+   0,5331 com E5) e a variante conservadora recupera só parte (0,4935). Como
+   *pós*-processador, o mesmo KG rende +0,009 sobre o texto cru e, combinado com
+   `unidades`, +0,0075 sobre o melhor resultado sem grafo — de 0,5547 para
+   **0,5622**, com R@3 subindo de 63,0% para 65,2%.
+
+   A explicação está nos exemplos de expansão: os termos que a busca local traz
+   são vocabulário **de família** — `ESTERIL USO UNICO`, `DESCARTAVEL`,
+   `DISPOSITIVO P/ ANESTESIA REGIONAL` — comuns a dezenas de candidatos do mesmo
+   PDM. Injetados na consulta, aproximam-na da família certa mas diluem o que
+   distingue os itens **dentro** dela, que é o que MRR e R@1 medem. O mesmo
+   conhecimento aplicado *depois*, sobre 10 candidatos que já são da família
+   certa, não sofre dessa diluição: ali a pergunta é qual candidato cobre os
+   atributos da consulta, e é exatamente isso que a cobertura de entidades mede.
+
+4. **O cross-encoder mMARCO degrada o ranking** em todas as linhas (−0,08 a
+   −0,12 MRR frente ao E5 puro). Ele foi treinado para relevância de passagem em
+   busca web, não para equivalência de itens de catálogo com atributos técnicos.
+
+5. **A melhor combinação não usa LLM nem blocking** e chega a MRR 0,5622 —
+   acima do 0,553 do pipeline completo com blocking por embedding e LLM em três
+   fases. A comparação tem ressalva (lá o ranking ocorre dentro do bloco de
+   candidatos), mas indica que boa parte do ganho do pipeline vem do par
+   E5 + sinais de atributo, e não das camadas mais caras.
+
+### Como executar
+
+```bash
+python avaliacao_modular_mmh.py                     # grade completa (100 combinações)
+python avaliacao_modular_mmh.py --listar            # lista os módulos disponíveis
+python avaliacao_modular_mmh.py --amostra 200       # subamostra de consultas (rápido)
+python avaliacao_modular_mmh.py --pre nada,graphrag --proc e5 --pos nada,unidades
+python avaliacao_modular_mmh.py --metrica recall_at_3   # troca a métrica das células
+python avaliacao_modular_mmh.py --graphrag-ms       # expansão via índice Microsoft
+python avaliacao_modular_mmh.py --sem-cache         # recalcula os pré-processadores
+```
+
+Tudo que é caro fica em `cache_embeddings/`: textos dos pré-processadores,
+embeddings E5 e scores do cross-encoder. A primeira execução completa leva ~1 h
+em CPU de 2 núcleos; as seguintes, ~30 s.
+
+**Reprodutibilidade.** Duas fontes de variação foram fechadas: os desempates da
+expansão GraphRAG passaram a ser ordenados por nome de entidade (antes herdavam
+a ordem de iteração de `set`, que muda com o hash seed do processo), e os textos
+dos pré-processadores são cacheados — necessário porque a construção do grafo
+léxico da fase [1] tem passo estocástico. Com o cache limpo, a linha
+`rede_semantica` da matriz oscila até ~0,01 MRR entre execuções; as demais são
+exatamente reprodutíveis.
+
+A assinatura do cache inclui o fonte de `preprocessamento_mmh.py`,
+`rede_semantica_mmh.py` e `graphrag_mmh.py`: mexer em qualquer um deles
+invalida os textos cacheados por segurança — inclusive edições inócuas, como um
+comentário. É o preço de não usar cache velho depois de uma mudança de lógica.
+
+### Adicionando um módulo
+
+Cada eixo é um registro `{id: Modulo}` no topo do arquivo. Para acrescentar um
+pré-processador, escreva `fn(corpus, ctx) -> Textos` e registre em
+`PRE_PROCESSADORES`; processadores implementam `fn(textos, top_k, ctx) ->
+(scores, idx)` e pós-processadores `fn(corpus, textos, scores, idx, ctx) ->
+scores`. Módulos que falharem (dependência ausente) deixam a célula como `n/d`
+sem derrubar a grade.
+
+---
+
 ## Arquivos gerados
 
 Todos os entregáveis ficam em `resultados/`:
@@ -204,6 +358,10 @@ Todos os entregáveis ficam em `resultados/`:
 | `analise_global.png`              | Visualização das comunidades e anomalias                 |
 | `rede_semantica_agulha.png`       | Vizinhança da família AGULHA no grafo léxico             |
 | `rede_semantica_geral.png`        | Visão geral da rede semântica (top 80 nós)               |
+| `avaliacao_modular.yaml`          | Grade modular: matriz, ranking das 100 combinações, módulos |
+| `matriz_pre_x_proc.csv`           | Matriz pré-processador × processador (MRR)               |
+| `ranking_combinacoes.csv`         | Combinações ordenadas por métrica, com tempos            |
+| `matriz_modular.png`              | Heatmap da matriz pré × proc                             |
 
 ---
 
@@ -212,6 +370,8 @@ Todos os entregáveis ficam em `resultados/`:
 ```
 mmh/
 ├── pipeline_completo_mmh.py      # orquestrador principal (fases [0]–[9])
+├── avaliacao_modular_mmh.py      # grade pré × proc × pós + ranking de combinações
+├── graphrag_mmh.py               # fase [6] (adjudicação) + pré-proc de expansão
 ├── rede_semantica_mmh.py         # fase [1]: grafo léxico + expansão
 ├── ontologia_owl_mmh.py          # fase [4]: OWL + reasoner Pellet (SWRL)
 ├── preprocessamento_mmh.py       # utilitários de normalização de texto

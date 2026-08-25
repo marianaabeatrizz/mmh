@@ -6,6 +6,10 @@
 # Caches de chamadas LLM (contêm texto do domínio; regeneráveis)
 cache_extracao_llm.json
 cache_graphrag_llm.json
+cache_graphrag_expansao.json
+
+# Cache de embeddings/scores da grade modular (~6 MB por combinação; regenerável)
+cache_embeddings/
 
 # Artefatos pesados/gerados
 __pycache__/
