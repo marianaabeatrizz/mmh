@@ -1,0 +1,3 @@
+﻿posicao,combinacao,pre,proc,pos,n_avaliados,mrr,recall_at_1,recall_at_3,recall_at_5,recall_at_10,precisao_at_1,tempo_total_s
+1,graphrag + e5_tfidf_char_lin + combinado_calibrado,graphrag,e5_tfidf_char_lin,combinado_calibrado,200,0.7471,0.635,0.85,0.905,0.945,0.635,1305.05
+2,graphrag + e5_tfidf_char_lin + nada,graphrag,e5_tfidf_char_lin,nada,200,0.7246,0.615,0.805,0.875,0.935,0.615,1302.72

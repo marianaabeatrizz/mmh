@@ -1,0 +1,275 @@
+INFO | Dataset: mmh | perfil: mmh
+INFO | ====================================================================
+INFO | [0] FONTES — Ingestão, catálogo e consultas
+INFO | ====================================================================
+INFO |   principal : 1264 registros
+INFO |   test      : 384 registros
+INFO |   opme_test : 464 registros
+INFO | ====================================================================
+INFO | [1] REDE SEMÂNTICA — Construção e aplicação
+INFO | ====================================================================
+INFO | Construindo grafo léxico de domínio...
+INFO | Carregado: 20260408_ground_truth_mmh_limpa.csv  (1264 registros)
+INFO | FastText lifecycle event {'params': 'FastText<vocab=0, vector_size=100, alpha=0.025>', 'datetime': '2026-09-23T07:14:24.500802', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'created'}
+INFO | collecting all words and their counts
+INFO | PROGRESS: at sentence #0, processed 0 words, keeping 0 word types
+INFO | collected 4010 word types from a corpus of 66363 raw words and 2528 sentences
+INFO | Creating a fresh vocabulary
+INFO | FastText lifecycle event {'msg': 'effective_min_count=3 retains 2242 unique words (55.91% of original 4010, drops 1768)', 'datetime': '2026-09-23T07:14:24.584457', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'prepare_vocab'}
+INFO | FastText lifecycle event {'msg': 'effective_min_count=3 leaves 63922 word corpus (96.32% of original 66363, drops 2441)', 'datetime': '2026-09-23T07:14:24.584680', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'prepare_vocab'}
+INFO | deleting the raw counts dictionary of 4010 items
+INFO | sample=0.001 downsamples 73 most-common words
+INFO | FastText lifecycle event {'msg': 'downsampling leaves estimated 51550.79657445717 word corpus (80.6%% of prior 63922)', 'datetime': '2026-09-23T07:14:24.602057', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'prepare_vocab'}
+INFO | estimated required memory for 2242 words, 2000000 buckets and 100 dimensions: 803358192 bytes
+INFO | resetting layer weights
+INFO | FastText lifecycle event {'update': False, 'trim_rule': 'None', 'datetime': '2026-09-23T07:14:27.032661', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'build_vocab'}
+INFO | FastText lifecycle event {'msg': 'training model with 4 workers on 2242 vocabulary and 100 features, using sg=1 hs=0 sample=0.001 negative=5 window=5 shrink_windows=True', 'datetime': '2026-09-23T07:14:27.033328', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'train'}
+INFO | EPOCH 0: training on 66363 raw words (51567 effective words) took 0.5s, 100300 effective words/s
+INFO | EPOCH 1: training on 66363 raw words (51522 effective words) took 0.7s, 69915 effective words/s
+INFO | EPOCH 2 - PROGRESS: at 84.61% examples, 40474 words/s, in_qsize 1, out_qsize 1
+INFO | EPOCH 2: training on 66363 raw words (51561 effective words) took 1.2s, 43198 effective words/s
+INFO | EPOCH 3: training on 66363 raw words (51566 effective words) took 0.5s, 110618 effective words/s
+INFO | EPOCH 4: training on 66363 raw words (51511 effective words) took 0.5s, 96118 effective words/s
+INFO | EPOCH 5: training on 66363 raw words (51545 effective words) took 0.6s, 89334 effective words/s
+INFO | EPOCH 6: training on 66363 raw words (51520 effective words) took 0.5s, 95674 effective words/s
+INFO | EPOCH 7: training on 66363 raw words (51582 effective words) took 0.4s, 124355 effective words/s
+INFO | EPOCH 8: training on 66363 raw words (51591 effective words) took 0.4s, 134722 effective words/s
+INFO | EPOCH 9: training on 66363 raw words (51536 effective words) took 0.4s, 118144 effective words/s
+INFO | EPOCH 10: training on 66363 raw words (51652 effective words) took 0.5s, 109187 effective words/s
+INFO | EPOCH 11: training on 66363 raw words (51571 effective words) took 0.4s, 139565 effective words/s
+INFO | EPOCH 12: training on 66363 raw words (51513 effective words) took 0.4s, 116937 effective words/s
+INFO | EPOCH 13: training on 66363 raw words (51594 effective words) took 0.5s, 95595 effective words/s
+INFO | EPOCH 14: training on 66363 raw words (51531 effective words) took 0.4s, 131981 effective words/s
+INFO | EPOCH 15: training on 66363 raw words (51472 effective words) took 0.5s, 110734 effective words/s
+INFO | EPOCH 16: training on 66363 raw words (51464 effective words) took 0.4s, 117443 effective words/s
+INFO | EPOCH 17: training on 66363 raw words (51475 effective words) took 0.4s, 123542 effective words/s
+INFO | EPOCH 18: training on 66363 raw words (51447 effective words) took 0.5s, 111803 effective words/s
+INFO | EPOCH 19: training on 66363 raw words (51579 effective words) took 0.4s, 134075 effective words/s
+INFO | EPOCH 20: training on 66363 raw words (51541 effective words) took 0.4s, 137962 effective words/s
+INFO | EPOCH 21: training on 66363 raw words (51630 effective words) took 0.5s, 112635 effective words/s
+INFO | EPOCH 22: training on 66363 raw words (51566 effective words) took 0.4s, 123046 effective words/s
+INFO | EPOCH 23: training on 66363 raw words (51547 effective words) took 0.5s, 113625 effective words/s
+INFO | EPOCH 24: training on 66363 raw words (51597 effective words) took 0.4s, 121650 effective words/s
+INFO | EPOCH 25: training on 66363 raw words (51705 effective words) took 0.4s, 140186 effective words/s
+INFO | EPOCH 26: training on 66363 raw words (51432 effective words) took 0.5s, 113195 effective words/s
+INFO | EPOCH 27: training on 66363 raw words (51511 effective words) took 0.4s, 135484 effective words/s
+INFO | EPOCH 28: training on 66363 raw words (51677 effective words) took 0.4s, 118801 effective words/s
+INFO | EPOCH 29: training on 66363 raw words (51551 effective words) took 0.5s, 110324 effective words/s
+INFO | FastText lifecycle event {'msg': 'training on 1990890 raw words (1546556 effective words) took 16.1s, 96100 effective words/s', 'datetime': '2026-09-23T07:14:43.126781', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'train'}
+INFO | Sem CSV de curadoria em C:\Users\Educação\mmh\dados\mmh\fila_curadoria_revisada.csv — nada a aplicar.
+INFO | Grafo construido: 5021 nos | 49009 arestas
+INFO | === Resumo do grafo ===
+INFO |   Nos Conceito: 2582
+INFO |   Nos PDM: 191
+INFO |   Nos Termo: 1671
+INFO |   Nos Unidade: 17
+INFO |   Nos ValorDeAtributo: 560
+INFO |   Arestas abreviacaoDe: 44
+INFO |   Arestas convertePara: 17
+INFO |   Arestas formaCanonicaDe: 27
+INFO |   Arestas hiperonimoDe: 11
+INFO |   Arestas mapeiaParaPDM: 2173
+INFO |   Arestas relacionadoA: 44774
+INFO |   Arestas sinonimoDe: 1956
+INFO |   Arestas varianteOrtograficaDe: 7
+INFO | Grafo exportado em GraphML: C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm\rede_semantica.graphml
+INFO | Vista SKOS exportada: C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm\rede_semantica_skos.ttl (62762 triplas | 78 altLabel | 48914 relacoes)
+INFO | Fila de curadoria: 200 arestas -> C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm\fila_curadoria.csv
+INFO | Gerando visualizações do grafo...
+INFO | Visualizacao salva em: C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm\rede_semantica_agulha_puncao_ossea.png
+INFO | Visualizacao salva em: C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm\rede_semantica_geral.png
+INFO | Normalizando, expandindo e ancorando 1012 consultas...
+INFO | ====================================================================
+INFO | [2] EXTRAÇÃO — Percepção (LLM) + validação de esquema
+INFO | ====================================================================
+INFO | [2] Extração via gpt-4o-mini (cache: C:\Users\Educação\mmh\cache\mmh\extracao_llm.json)
+INFO | Extraindo atributos de 1012 consultas e-Fisco (8 threads)...
+INFO | Extraindo atributos de 1054 itens do catálogo CATMAT...
+INFO | ====================================================================
+INFO | [3] BLOCKING — Geração de candidatos
+INFO | ====================================================================
+INFO | [blocking] Similaridade fundida para blocking semântico...
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_basico_cd9a6945ea77617c.npz
+INFO | [fusão] 0.70xe5 + 0.15xtfidf + 0.15xtfidf_char sobre 'efisco_processado': 1012 x 1054.
+INFO | ====================================================================
+INFO | [4] ONTOLOGIA — OWL + reasoner Pellet (SWRL §2.2)
+INFO | ====================================================================
+INFO | TBox montada: 208 classes PDM | 11 propriedades | 15 regras SWRL
+INFO | ABox: {'n_classes_pdm': 208, 'n_propriedades': 11, 'n_individuos': 2065, 'n_regras_swrl': 15}
+INFO | Deducao por lotes: 2065 individuos em 8 lotes (teto 300).
+INFO |   lote 5/8 — 1722 equivalencias ate aqui (22s)
+INFO |   lote 8/8 — 1830 equivalencias ate aqui (33s)
+INFO | Ontologia OWL salva: C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm\ontologia.owl
+INFO | ====================================================================
+INFO | [5] MATCHER NEURAL — bi-encoder + cross-encoder
+INFO | ====================================================================
+INFO | Estágio 1: pontuando blocos pela fusão e retendo top-20 por consulta...
+INFO | Estágio 1 -> 20240 pares mantidos (de 67533 candidatos).
+INFO | Estágio 2 desligado (--sem-cross): score neural = fusão.
+INFO | ====================================================================
+INFO | [5b] SINAIS SIMBÓLICOS — medida, GraphRAG-IDF, taxonomia
+INFO | ====================================================================
+INFO | [GraphRAG/pré] KG: 7432 nós, 35036 arestas, 5366 entidades, 12 comunidades
+INFO | [taxonomia] histórico: 19 classes e-Fisco x 30 classes CATMAT, 58 pares de classe distintos, 0 de grupo.
+INFO | ====================================================================
+INFO | [6] GRAPHRAG — Microsoft GraphRAG (indexacao + local_search + LLM)
+INFO | ====================================================================
+INFO | [6] Índice Microsoft GraphRAG não usado (--contexto-ms liga).
+INFO | [6] Zona cinzenta (margem < 0.05): 951 consultas; teto 500 — adjudicando as de menor margem (máxima adjudicada: 0.006).
+INFO | [6] Adjudicando 500 consultas em modo 'lista' (8 threads)...
+INFO | ====================================================================
+INFO | [8] CONFIANÇA — Combinação, ranqueamento e trilha
+INFO | ====================================================================
+INFO | ====================================================================
+INFO | [*] AVALIAÇÃO — recall@k / MRR / precisão do top-1
+INFO | ====================================================================
+INFO | ====================================================================
+INFO | [7] GRAFO UNIFICADO — Materialização
+INFO | ====================================================================
+INFO | ====================================================================
+INFO | [8b] EXPLICABILIDADE — Justificativa em linguagem natural
+INFO | ====================================================================
+INFO | ====================================================================
+INFO | [9] ANÁLISE GLOBAL — Comunidades, deduplicação, anomalias
+INFO | ====================================================================
+[--saida] saída: C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm
+
+====================================================================
+  PIPELINE NEURO-SIMBÓLICO — CATMAT <-> e-Fisco [mmh]
+  Domínio: mmh | Rede semântica + OWL + Neural + GraphRAG
+  LLM: gpt-4o-mini | Rede semântica: ativa | Cross-encoder: desligado | Sinais [5b]: ativos
+====================================================================
+
+=== [0] FONTES ===
+  Pares no gabarito       : 1264  (só para avaliação)
+  Catálogo CATMAT (busca) : 1054 itens únicos
+  Consultas e-Fisco       : 1012 itens únicos
+  PDMs distintos          : 191
+  OK sem flags            : 809  (64.0%)
+
+=== [1] REDE SEMÂNTICA ===
+  Nós no grafo            : 5021
+  Arestas no grafo        : 49009
+  Consultas com âncora PDM: 1012 / 1012
+  Taxa OOV (tokens)       : 19.8%
+  Exemplo doc. expandido  : AGULHA MIELOGRAMA ACO INOXIDAVEL ASPIRATIVA ESTERNO CRISTA ILIACA LIMITADOR PROFUNDIDADE S...
+
+=== [2] EXTRAÇÃO ===
+  Fonte                   : LLM 2066 | regex 0 | erros 0
+  Consultas com atributos : 1010 / 1012
+  Catálogo com atributos  : 1054 / 1054
+  Esquema completo (SHACL): 841 / 1012
+  Escore médio completude : 0.905
+
+=== [3] BLOCKING ===
+  Consultas               : 1012
+  Pares candidatos gerados: 67533
+  Bloco médio             : 66.7  (máx 205)
+  Origem do bloco         : {'pdm': 1012}
+  RECALL DO BLOCKING      : 98.8%  (1000/1012)  <- teto do pipeline
+
+=== [4] ONTOLOGIA ===
+  Indivíduos na ABox      : 2065
+  Regras SWRL             : 15
+  Pares avaliados         : 67533
+    incompleto     :  46326  (68.6%)
+    veto           :  19290  (28.6%)
+    equivalenteA   :   1830  (2.7%)
+    broadMatch     :     87  (0.1%)
+
+=== [5] MATCHER NEURAL ===
+  Estágio 1 (fusão)       : intfloat/multilingual-e5-base + TF-IDF palavra + TF-IDF caractere (e5 0.70, tfidf 0.15, tfidf_char 0.15) sobre 'efisco_processado'
+  Estágio 2               : desligado
+  Pares pontuados         : 20240
+  Score cosine E5 médio   : 0.878
+  Score fusão médio       : 0.663
+  Score cross médio       : 0.663
+  Score neural médio      : 0.663
+
+=== [5b] SINAIS SIMBÓLICOS ===
+  Consultas com medida    : 786 / 1012  (catálogo 723 / 1054)
+  KG                      : 7432 nós, 3431 entidades, 12 comunidades
+  Taxonomia (LOO)         : correto compatível em 97.3% das consultas; 4 classes sem histórico
+  Dedução ontológica      : 1191 pares com equivalenteA/broadMatch entre os 20240 do top-K
+  Pares com algum sinal   : 19850 / 20240
+  Pesos                   : 0.05 x {'medidas': 0.6, 'graphrag_idf': 1.0, 'taxonomia': 0.3, 'ontologia': 0.6}
+
+=== [6] GRAPHRAG (adjudicação) ===
+  Indice Microsoft        : não usado
+  Arestas grafo TF-IDF    : 1839
+  Zona cinzenta (margem)  : 951 consultas
+  Adjudicacao             : modo lista | LLM 500 | votacao 320
+  Ajuste medio de score   : 0.0330
+
+=== [8] CONFIANÇA ===
+  Pares ranqueados        : 20240
+  Consultas com decisão   : 1012
+  Score final médio (top1): 0.740
+  Alta                   :    61  (6.0%)
+  Média                  :   165  (16.3%)
+  Baixa                  :   786  (77.7%)
+
+=== [*] AVALIAÇÃO DE RETRIEVAL ===
+  Consultas avaliadas     : 1012
+  Recall do blocking (teto): 98.8%
+  MRR                     : 0.6771
+  Recall@1                : 56.6%
+  Recall@3                : 75.2%
+  Recall@5                : 81.5%
+  Recall@10               : 89.3%
+  Precisão@1              : 56.6%
+
+  Ablação (mesmo top-K, reordenado por cada camada):
+    camada                                   MRR     R@1     R@3    R@10
+    cosseno E5 (só o bi-encoder)          0.5490   41.3%   61.4%   84.1%
+    fusão E5+TF-IDF (estágio 1)           0.6405   51.7%   72.1%   87.9%
+    + cross-encoder (estágio 2)           0.6405   51.7%   72.1%   87.9%
+    + sinais simbólicos (fase 5b)         0.6719   54.8%   75.9%   90.2%
+    + adjudicação (fase 6) = score final  0.6771   56.6%   75.2%   89.3%
+
+  Confiança (margem 1o-2o) contra o gabarito:
+    faixa        n       %     P@1     R@3
+    Alta        61    6.0%   95.1%   98.4%
+    Média      165   16.3%   80.6%   88.5%
+    Baixa      786   77.7%   48.6%   70.6%
+
+=== [7] GRAFO UNIFICADO ===
+  Nós                     : 2257
+  Arestas                 : 22306
+  :equivalenteA afirmadas : 215
+  :candidatoA (não decid.): 20025
+  Exportado               : grafo_unificado.graphml
+
+=== [8b] EXPLICABILIDADE ===
+  Explicações geradas     : 60
+
+=== [9] ANÁLISE GLOBAL ===
+  Comunidades (>1 item)   : 172
+  Maiores comunidades     : [37, 19, 18, 15, 14, 13, 12, 12]
+  Grupos de duplicatas    : 120
+    ex.: 5 itens e-Fisco -> CATMAT 628518
+  Anomalias (top1 != gab.): 439
+
+  Top-5 PDMs por volume:
+    FIO DE SUTURA AGULHADO             n=  69  score=0.806  alta=0
+    SONDA TRATO URINARIO               n=  45  score=0.735  alta=2
+    EMBALAGEM P/ ESTERILIZACAO         n=  43  score=0.720  alta=0
+    CANULA DE TRAQUEOSTOMIA            n=  43  score=0.758  alta=1
+    FIO DE SUTURA S/ AGULHA            n=  42  score=0.753  alta=0
+
+  PDMs com maior OOV médio:
+    TERMOHIGROMETRO                    OOV=55.0
+    REAGENTE PARA DIAGNOSTICO CLINICO  OOV=32.5
+    TRANSDUTOR USO MEDICO              OOV=29.0
+    GAZE USO EM SAUDE                  OOV=22.7
+    TERMOMETRO                         OOV=22.0
+
+====================================================================
+  PIPELINE CONCLUÍDO em 549.7s
+  Saída          : C:\Users\Educação\mmh\resultados\mmh\pipeline_final_llm
+    resultado_pipeline_completo.csv
+    stats_pipeline.json
+    grafo_unificado.graphml
+    ontologia.owl
+    rede_semantica_skos.ttl
+====================================================================

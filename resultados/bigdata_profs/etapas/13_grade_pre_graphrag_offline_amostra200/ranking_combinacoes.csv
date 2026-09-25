@@ -1,0 +1,17 @@
+﻿posicao,combinacao,pre,proc,pos,n_avaliados,mrr,recall_at_1,recall_at_3,recall_at_5,recall_at_10,precisao_at_1,tempo_total_s
+1,basico + e5_tfidf_char_lin + combinado_calibrado,basico,e5_tfidf_char_lin,combinado_calibrado,200,0.7586,0.655,0.845,0.9,0.935,0.655,2.51
+2,nada + e5_tfidf_char_lin + combinado_calibrado,nada,e5_tfidf_char_lin,combinado_calibrado,200,0.7431,0.625,0.83,0.89,0.93,0.625,3.16
+3,nada + e5_tfidf_char_lin + nada,nada,e5_tfidf_char_lin,nada,200,0.7232,0.6,0.81,0.88,0.93,0.6,3.13
+4,basico + e5_tfidf_char_lin + nada,basico,e5_tfidf_char_lin,nada,200,0.7284,0.62,0.805,0.875,0.935,0.62,2.48
+5,graphrag_leve + e5_tfidf_char_lin + combinado_calibrado,graphrag_leve,e5_tfidf_char_lin,combinado_calibrado,200,0.724,0.615,0.805,0.88,0.925,0.615,4.04
+6,graphrag + e5_tfidf_char_lin + combinado_calibrado,graphrag,e5_tfidf_char_lin,combinado_calibrado,200,0.6912,0.565,0.795,0.84,0.915,0.565,6.14
+7,nada + e5 + combinado_calibrado,nada,e5,combinado_calibrado,200,0.6895,0.565,0.79,0.87,0.9,0.565,441.13
+8,graphrag_leve + e5_tfidf_char_lin + nada,graphrag_leve,e5_tfidf_char_lin,nada,200,0.6888,0.57,0.78,0.835,0.92,0.57,4.01
+9,basico + e5 + combinado_calibrado,basico,e5,combinado_calibrado,200,0.6891,0.58,0.77,0.83,0.87,0.58,274.74
+10,graphrag_leve + e5 + combinado_calibrado,graphrag_leve,e5,combinado_calibrado,200,0.6568,0.535,0.765,0.825,0.875,0.535,270.58
+11,graphrag + e5_tfidf_char_lin + nada,graphrag,e5_tfidf_char_lin,nada,200,0.6513,0.525,0.74,0.815,0.9,0.525,6.11
+12,graphrag + e5 + combinado_calibrado,graphrag,e5,combinado_calibrado,200,0.649,0.535,0.735,0.815,0.86,0.535,301.41
+13,basico + e5 + nada,basico,e5,nada,200,0.6389,0.525,0.72,0.78,0.855,0.525,274.62
+14,nada + e5 + nada,nada,e5,nada,200,0.6411,0.51,0.715,0.82,0.9,0.51,437.12
+15,graphrag_leve + e5 + nada,graphrag_leve,e5,nada,200,0.6052,0.465,0.695,0.805,0.88,0.465,270.45
+16,graphrag + e5 + nada,graphrag,e5,nada,200,0.5987,0.48,0.65,0.755,0.86,0.48,301.3

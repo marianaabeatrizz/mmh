@@ -1,0 +1,5 @@
+﻿pos,n_avaliados,mrr,recall_at_1,recall_at_3,recall_at_5,recall_at_10,precisao_at_1,s
+nada,1375,0.7396,0.6385,0.8124,0.8647,0.9164,0.6385,6.7
+medidas,1375,0.737,0.6378,0.8029,0.864,0.9149,0.6378,10.1
+medidas_graphrag_idf,1375,0.7503,0.656,0.824,0.8756,0.9193,0.656,14.3
+combinado_calibrado,1375,0.7541,0.6611,0.8233,0.88,0.9193,0.6611,19.2

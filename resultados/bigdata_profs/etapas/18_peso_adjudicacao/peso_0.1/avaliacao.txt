@@ -1,0 +1,40 @@
+=== [6] GRAPHRAG (adjudicação) ===
+  Indice Microsoft        : não usado
+  Arestas grafo TF-IDF    : 2712
+  Zona cinzenta (margem)  : 904 consultas
+  Adjudicacao             : modo lista | LLM 500 | votacao 180
+  Ajuste medio de score   : 0.0379
+
+=== [8] CONFIANÇA ===
+  Pares ranqueados        : 27500
+  Consultas com decisão   : 1375
+  Score final médio (top1): 0.749
+  Alta                   :   473  (34.4%)
+  Média                  :   304  (22.1%)
+  Baixa                  :   598  (43.5%)
+
+=== [*] AVALIAÇÃO DE RETRIEVAL ===
+  Consultas avaliadas     : 1375
+  Recall do blocking (teto): 96.8%
+  MRR                     : 0.7834
+  Recall@1                : 69.9%
+  Recall@3                : 85.2%
+  Recall@5                : 88.8%
+  Recall@10               : 92.3%
+  Precisão@1              : 69.9%
+
+  Ablação (mesmo top-K, reordenado por cada camada):
+    camada                                   MRR     R@1     R@3    R@10
+    cosseno E5 (só o bi-encoder)          0.6760   56.4%   75.1%   88.7%
+    fusão E5+TF-IDF (estágio 1)           0.7433   64.4%   81.9%   91.8%
+    + cross-encoder (estágio 2)           0.7433   64.4%   81.9%   91.8%
+    + sinais simbólicos (fase 5b)         0.7658   67.2%   84.0%   92.3%
+    + adjudicação (fase 6) = score final  0.7834   69.9%   85.2%   92.3%
+
+  Confiança (margem 1o-2o) contra o gabarito:
+    faixa        n       %     P@1     R@3
+    Alta       473   34.4%   96.2%   98.3%
+    Média      304   22.1%   76.0%   90.8%
+    Baixa      598   43.5%   46.0%   72.1%
+
+=== [7] GRAFO UNIFICADO ===

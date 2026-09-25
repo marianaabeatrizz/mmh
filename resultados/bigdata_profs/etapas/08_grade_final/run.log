@@ -1,0 +1,108 @@
+INFO | Dataset: bigdata_profs | perfil: compras_publicas
+INFO | Corpus [bigdata_profs]: 1375 consultas x 1297 itens de catálogo (1375 com gabarito).
+INFO | Grade: 2 pré × 5 proc × 7 pós = 70 combinações.
+INFO | [pré/nada] Textos reaproveitados do cache: pre_nada_7c40e04189cb25aa.json
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_nada_f42766a71c1cc825.npz
+INFO |   nada           | e5        | nada      -> MRR 0.6748  R@1 0.569  R@3 0.740
+INFO | [pós/medidas] consultas com medida: 1015/1375 | catálogo: 865/1297 | bases: MM=654, ML=181, G=159, PCT=137, V=72, MG_ML=54
+INFO |   nada           | e5        | medidas   -> MRR 0.6624  R@1 0.550  R@3 0.732
+INFO | [GraphRAG/pré] KG: 12380 nós, 32261 arestas, 9708 entidades, 98 comunidades
+INFO |   nada           | e5        | graphrag_idf_aditivo -> MRR 0.7000  R@1 0.596  R@3 0.773
+INFO | [taxonomia] histórico: 162 classes e-Fisco x 154 classes CATMAT, 324 pares de classe distintos, 148 de grupo.
+INFO | [taxonomia] correto com compatibilidade > 0 (LOO): 91.8% das consultas; classe sem histórico: 133
+INFO |   nada           | e5        | taxonomia -> MRR 0.6573  R@1 0.546  R@3 0.726
+INFO |   nada           | e5        | medidas_graphrag -> MRR 0.7006  R@1 0.597  R@3 0.773
+INFO |   nada           | e5        | medidas_graphrag_idf -> MRR 0.7092  R@1 0.608  R@3 0.780
+INFO |   nada           | e5        | combinado_calibrado -> MRR 0.7211  R@1 0.623  R@3 0.794
+INFO |   nada           | e5_tfidf  | nada      -> MRR 0.6744  R@1 0.563  R@3 0.746
+INFO |   nada           | e5_tfidf  | medidas   -> MRR 0.6467  R@1 0.526  R@3 0.724
+INFO |   nada           | e5_tfidf  | graphrag_idf_aditivo -> MRR 0.6341  R@1 0.513  R@3 0.712
+INFO |   nada           | e5_tfidf  | taxonomia -> MRR 0.6120  R@1 0.487  R@3 0.684
+INFO |   nada           | e5_tfidf  | medidas_graphrag -> MRR 0.6520  R@1 0.530  R@3 0.733
+INFO |   nada           | e5_tfidf  | medidas_graphrag_idf -> MRR 0.6588  R@1 0.541  R@3 0.733
+INFO |   nada           | e5_tfidf  | combinado_calibrado -> MRR 0.6632  R@1 0.541  R@3 0.750
+INFO |   nada           | e5_tfidf_lin | nada      -> MRR 0.7217  R@1 0.623  R@3 0.793
+INFO |   nada           | e5_tfidf_lin | medidas   -> MRR 0.7075  R@1 0.604  R@3 0.777
+INFO |   nada           | e5_tfidf_lin | graphrag_idf_aditivo -> MRR 0.7198  R@1 0.618  R@3 0.798
+INFO |   nada           | e5_tfidf_lin | taxonomia -> MRR 0.7105  R@1 0.608  R@3 0.787
+INFO |   nada           | e5_tfidf_lin | medidas_graphrag -> MRR 0.7296  R@1 0.628  R@3 0.807
+INFO |   nada           | e5_tfidf_lin | medidas_graphrag_idf -> MRR 0.7344  R@1 0.636  R@3 0.815
+INFO |   nada           | e5_tfidf_lin | combinado_calibrado -> MRR 0.7361  R@1 0.636  R@3 0.821
+INFO |   nada           | e5_char_lin | nada      -> MRR 0.7410  R@1 0.644  R@3 0.811
+INFO |   nada           | e5_char_lin | medidas   -> MRR 0.7364  R@1 0.636  R@3 0.808
+INFO |   nada           | e5_char_lin | graphrag_idf_aditivo -> MRR 0.7355  R@1 0.636  R@3 0.811
+INFO |   nada           | e5_char_lin | taxonomia -> MRR 0.7339  R@1 0.635  R@3 0.802
+INFO |   nada           | e5_char_lin | medidas_graphrag -> MRR 0.7554  R@1 0.662  R@3 0.829
+INFO |   nada           | e5_char_lin | medidas_graphrag_idf -> MRR 0.7597  R@1 0.669  R@3 0.828
+INFO |   nada           | e5_char_lin | combinado_calibrado -> MRR 0.7554  R@1 0.660  R@3 0.828
+INFO |   nada           | e5_tfidf_char_lin | nada      -> MRR 0.7396  R@1 0.638  R@3 0.812
+INFO |   nada           | e5_tfidf_char_lin | medidas   -> MRR 0.7353  R@1 0.635  R@3 0.801
+INFO |   nada           | e5_tfidf_char_lin | graphrag_idf_aditivo -> MRR 0.7324  R@1 0.633  R@3 0.807
+INFO |   nada           | e5_tfidf_char_lin | taxonomia -> MRR 0.7367  R@1 0.635  R@3 0.811
+INFO |   nada           | e5_tfidf_char_lin | medidas_graphrag -> MRR 0.7518  R@1 0.657  R@3 0.825
+INFO |   nada           | e5_tfidf_char_lin | medidas_graphrag_idf -> MRR 0.7502  R@1 0.654  R@3 0.826
+INFO |   nada           | e5_tfidf_char_lin | combinado_calibrado -> MRR 0.7533  R@1 0.658  R@3 0.826
+INFO | [pré/basico] Textos reaproveitados do cache: pre_basico_b9b3f49bf5e0d520.json
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_basico_d3935162a3ff8289.npz
+INFO |   basico         | e5        | nada      -> MRR 0.6689  R@1 0.562  R@3 0.743
+INFO |   basico         | e5        | medidas   -> MRR 0.6575  R@1 0.545  R@3 0.738
+INFO |   basico         | e5        | graphrag_idf_aditivo -> MRR 0.6924  R@1 0.591  R@3 0.769
+INFO |   basico         | e5        | taxonomia -> MRR 0.6457  R@1 0.537  R@3 0.717
+INFO |   basico         | e5        | medidas_graphrag -> MRR 0.6924  R@1 0.585  R@3 0.780
+INFO |   basico         | e5        | medidas_graphrag_idf -> MRR 0.7044  R@1 0.602  R@3 0.789
+INFO |   basico         | e5        | combinado_calibrado -> MRR 0.7143  R@1 0.615  R@3 0.798
+INFO |   basico         | e5_tfidf  | nada      -> MRR 0.7097  R@1 0.602  R@3 0.788
+INFO |   basico         | e5_tfidf  | medidas   -> MRR 0.6660  R@1 0.544  R@3 0.748
+INFO |   basico         | e5_tfidf  | graphrag_idf_aditivo -> MRR 0.6505  R@1 0.523  R@3 0.743
+INFO |   basico         | e5_tfidf  | taxonomia -> MRR 0.6326  R@1 0.513  R@3 0.707
+INFO |   basico         | e5_tfidf  | medidas_graphrag -> MRR 0.6743  R@1 0.555  R@3 0.763
+INFO |   basico         | e5_tfidf  | medidas_graphrag_idf -> MRR 0.6730  R@1 0.552  R@3 0.759
+INFO |   basico         | e5_tfidf  | combinado_calibrado -> MRR 0.6777  R@1 0.560  R@3 0.762
+INFO |   basico         | e5_tfidf_lin | nada      -> MRR 0.7300  R@1 0.626  R@3 0.809
+INFO |   basico         | e5_tfidf_lin | medidas   -> MRR 0.7164  R@1 0.611  R@3 0.802
+INFO |   basico         | e5_tfidf_lin | graphrag_idf_aditivo -> MRR 0.7299  R@1 0.626  R@3 0.812
+INFO |   basico         | e5_tfidf_lin | taxonomia -> MRR 0.7229  R@1 0.619  R@3 0.802
+INFO |   basico         | e5_tfidf_lin | medidas_graphrag -> MRR 0.7406  R@1 0.641  R@3 0.821
+INFO |   basico         | e5_tfidf_lin | medidas_graphrag_idf -> MRR 0.7418  R@1 0.642  R@3 0.820
+INFO |   basico         | e5_tfidf_lin | combinado_calibrado -> MRR 0.7454  R@1 0.648  R@3 0.825
+INFO |   basico         | e5_char_lin | nada      -> MRR 0.7327  R@1 0.633  R@3 0.806
+INFO |   basico         | e5_char_lin | medidas   -> MRR 0.7381  R@1 0.639  R@3 0.818
+INFO |   basico         | e5_char_lin | graphrag_idf_aditivo -> MRR 0.7366  R@1 0.633  R@3 0.819
+INFO |   basico         | e5_char_lin | taxonomia -> MRR 0.7300  R@1 0.630  R@3 0.805
+INFO |   basico         | e5_char_lin | medidas_graphrag -> MRR 0.7523  R@1 0.657  R@3 0.827
+INFO |   basico         | e5_char_lin | medidas_graphrag_idf -> MRR 0.7546  R@1 0.659  R@3 0.831
+INFO |   basico         | e5_char_lin | combinado_calibrado -> MRR 0.7550  R@1 0.659  R@3 0.832
+INFO |   basico         | e5_tfidf_char_lin | nada      -> MRR 0.7433  R@1 0.644  R@3 0.819
+INFO |   basico         | e5_tfidf_char_lin | medidas   -> MRR 0.7443  R@1 0.644  R@3 0.827
+INFO |   basico         | e5_tfidf_char_lin | graphrag_idf_aditivo -> MRR 0.7441  R@1 0.643  R@3 0.822
+INFO |   basico         | e5_tfidf_char_lin | taxonomia -> MRR 0.7386  R@1 0.635  R@3 0.821
+INFO |   basico         | e5_tfidf_char_lin | medidas_graphrag -> MRR 0.7567  R@1 0.660  R@3 0.834
+INFO |   basico         | e5_tfidf_char_lin | medidas_graphrag_idf -> MRR 0.7583  R@1 0.661  R@3 0.836
+INFO |   basico         | e5_tfidf_char_lin | combinado_calibrado -> MRR 0.7630  R@1 0.668  R@3 0.842
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                                 e5           e5_tfidf       e5_tfidf_lin        e5_char_lin  e5_tfidf_char_lin
+nada                         0.7404             0.7462             0.7935            0.8109*            0.8124*
+basico                       0.7425             0.7884             0.8087             0.8065            0.8189*
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   basico + e5_tfidf_char_lin + combinado_calibrado    0.8415   0.668   0.842   0.923     0.3
+2   basico + e5_tfidf_char_lin + medidas_graphrag_idf    0.8364   0.661   0.836   0.922     0.3
+3   basico + e5_tfidf_char_lin + medidas_graphrag     0.8342   0.660   0.834   0.920     0.2
+4   basico + e5_char_lin + combinado_calibrado        0.8320   0.659   0.832   0.923     2.9
+5   basico + e5_char_lin + medidas_graphrag_idf       0.8305   0.659   0.831   0.921     2.9
+6   nada + e5_char_lin + medidas_graphrag             0.8291   0.662   0.829   0.918     4.1
+7   nada + e5_char_lin + medidas_graphrag_idf         0.8284   0.669   0.828   0.920     4.1
+8   nada + e5_char_lin + combinado_calibrado          0.8276   0.660   0.828   0.919     4.1
+9   basico + e5_char_lin + medidas_graphrag           0.8269   0.657   0.827   0.918     2.9
+10  basico + e5_tfidf_char_lin + medidas              0.8269   0.644   0.827   0.918     0.2
+
+=== ARQUIVOS GERADOS ===
+  C:\Users\Educação\mmh\resultados\bigdata_profs\avaliacao_modular.yaml
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_pre_x_proc.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\ranking_combinacoes.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_modular.png
+
+Tempo total: 25.2s

@@ -1,0 +1,145 @@
+INFO:
+  DATA: '2026-09-23 04:58:20'
+  ARQUITETURA: pré-proc x processador x pós-proc (pipeline.jpg)
+  METRICA_MATRIZ: recall_at_3
+  TOP_K_CANDIDATOS: 20
+  DADOS:
+    DATASET: bigdata_profs
+    GROUND_TRUTH: 20260916_ground_truth_bigdata_profs_completo_test_ouro.csv
+    N_CONSULTAS: 200
+    N_CATALOGO: 1297
+    BLOCKING: nenhum — catálogo inteiro por consulta
+  PERFIL:
+    NOME: compras_publicas
+    DESCRICAO: compras públicas (Brasil) — material hospitalar, medicamentos e bens de uso geral
+    TAMANHOS:
+      boilerplate: 13
+      stopwords: 41
+      abreviacoes: 20
+      variantes: 7
+      sinonimos: 5
+      hierarquia: 11
+      unidades: 23
+      familias: 27
+      atributos: 21
+      atributos_definidores: 22
+      regras_extracao: 9
+    PROVENIENCIA:
+      boilerplate: curado
+      stopwords: curado
+      sinonimos_regex: curado
+      abreviacoes: curado
+      variantes: curado
+      sinonimos: curado
+      hierarquia: curado
+      unidades: curado
+      atributos: curado
+      atributos_definidores: curado
+      extracao: curado
+      entidade_stopwords: curado
+      familias_extra: curado
+      medidas: curado
+    LACUNAS: []
+  MODULOS:
+    PRE:
+    - ID: graphrag
+      NOME: GraphRAG (expansão por grafo)
+      DESCRICAO: 6 entidades vizinhas no KG + rótulo da comunidade
+    PROC:
+    - ID: e5_tfidf_char_lin
+      NOME: E5 + TF-IDF palavra + caractere (linear)
+      DESCRICAO: as três fontes léxico-densas somadas
+    POS:
+    - ID: nada
+      NOME: Pós-proc 1 (Nada)
+      DESCRICAO: ranking do processador, sem reordenação
+    - ID: combinado_calibrado
+      NOME: Medida 0,6 + GraphRAG IDF 1,0 + taxonomia 0,3
+      DESCRICAO: os três sinais com pesos relativos calibrados (x peso_medidas)
+META_PRE:
+  graphrag:
+    transformacao: básico + expansão GraphRAG
+    modo: ms_graphrag
+    n_consultas: 200
+    media_termos_adicionados: 6.0
+    taxa_expandidas: 1.0
+META_SINAIS:
+  MEDIDAS:
+    consultas:
+      com_medida: 155
+      total: 200
+      por_base:
+        MM: 95
+        ML: 36
+        PCT: 25
+        G: 24
+        V: 17
+        MG_ML: 7
+        FR: 5
+        G_GAUGE: 4
+        W: 3
+    catalogo:
+      com_medida: 865
+      total: 1297
+      por_base:
+        MM: 559
+        G: 139
+        ML: 86
+        PCT: 82
+        FR: 55
+        MG_ML: 42
+        G_GAUGE: 38
+        V: 36
+        W: 18
+        UI: 7
+  TAXONOMIA:
+    n_classes_efisco: 63
+    n_classes_catmat: 57
+    n_pares_classe_distintos: 86
+    n_grupos_efisco: 23
+    n_pares_grupo_distintos: 40
+    consultas_com_classe: 196
+    catalogo_com_classe: 1297
+    consultas: 200
+    correto_com_compatibilidade: 165
+    classe_sem_historico_loo: 68
+    fracao_correto_compativel: 0.825
+MATRIZ:
+  graphrag:
+    e5_tfidf_char_lin: 0.805
+RANKING:
+- POSICAO: 1
+  COMBINACAO: graphrag + e5_tfidf_char_lin + combinado_calibrado
+  PRE: graphrag
+  PROC: e5_tfidf_char_lin
+  POS: combinado_calibrado
+  METRICAS:
+    n_avaliados: 200
+    mrr: 0.7471
+    recall_at_1: 0.635
+    recall_at_3: 0.85
+    recall_at_5: 0.905
+    recall_at_10: 0.945
+    precisao_at_1: 0.635
+  TEMPO_S:
+    pre: 1055.93
+    proc: 246.79
+    pos: 2.33
+- POSICAO: 2
+  COMBINACAO: graphrag + e5_tfidf_char_lin + nada
+  PRE: graphrag
+  PROC: e5_tfidf_char_lin
+  POS: nada
+  METRICAS:
+    n_avaliados: 200
+    mrr: 0.7246
+    recall_at_1: 0.615
+    recall_at_3: 0.805
+    recall_at_5: 0.875
+    recall_at_10: 0.935
+    precisao_at_1: 0.615
+  TEMPO_S:
+    pre: 1055.93
+    proc: 246.79
+    pos: 0.0
+SEM_VALOR: []

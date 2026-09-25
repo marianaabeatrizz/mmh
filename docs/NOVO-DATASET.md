@@ -134,6 +134,38 @@ pelo perfil — serve de controle do próprio experimento.
 
 ---
 
+## Caso 2b — domínio VIZINHO de um perfil existente: herança
+
+Quando o corpus é "o MMH mais alguma coisa" — o caso do `bigdata_profs`, que
+mistura material hospitalar com medicamentos, mobiliário, alimentos e
+informática —, não copie o YAML: declare `herda:` e escreva só a diferença.
+
+```yaml
+# config/perfis/compras_publicas.yaml
+herda: mmh                    # todo o léxico, boilerplate e unidades do MMH
+nome: compras_publicas
+unidades:                     # só o que o MMH deixa de fora de propósito
+  MG: {categoria: massa, base: G, fator_para_base: 0.001, aliases: [MG, MILIGRAMA]}
+  MG_ML: {categoria: concentracao, base: MG_ML, aliases: [MG/ML]}
+  PCT: {categoria: concentracao, base: PCT, aliases: ['%']}
+```
+
+A resolução é `base.yaml` → perfil pai → perfil filho, merge recursivo, o
+filho vence chave a chave (`config.py`, `_ler_perfil_yaml`). Herança circular
+é erro. Dois cuidados:
+
+- **Unidade com o mesmo alias em duas escalas** ("G" é gauge no MMH e grama em
+  alimentos): o extrator lê primeiro o padrão mais restrito (com `faixa` ou
+  `inteiro`), então "16 G" vira calibre e "500 G" sobra para a massa. Declare a
+  faixa na unidade estreita, não na larga.
+- **Cadeia de dimensões** ("210X86X162 CM", "1,20 X 0,80 M"): a unidade final é
+  propagada a todos os números da cadeia. Nada a declarar; vale para qualquer
+  alias alfanumérico de sufixo.
+
+O perfil `mmh` não muda, e os números publicados sobre ele continuam válidos.
+
+---
+
 ## Caso 3 — domínio novo, com perfil curado
 
 Copie `config/perfis/mmh.yaml` como ponto de partida e substitua o conteúdo de

@@ -1,8 +1,24 @@
-# Resultados do Pipeline — CATMAT ↔ e-Fisco
+# Resultados do Pipeline — CATMAT ↔ e-Fisco (dataset `mmh`)
 
-Pipeline neuro-simbólico para casamento automático de itens entre os catálogos CATMAT e e-Fisco/CADMAT do Estado de Pernambuco. Implementa as fases [0]–[9] da Figura 3 do documento técnico.
+Pipeline neuro-simbólico para casamento automático de itens entre os catálogos CATMAT e e-Fisco/CADMAT do Estado de Pernambuco. Implementa as fases [0]–[9] da Figura 3 do documento técnico. A arquitetura está descrita no **[README.md](README.md)**.
 
 Os números deste documento são do dataset **`mmh`** (Material Médico Hospitalar), que segue sendo o dataset padrão. O pipeline é agnóstico de domínio: o conhecimento de domínio vive em `config/perfis/`, o corpus em `config/datasets/`, e nenhuma fase tem vocabulário hospitalar embutido — ver **[docs/NOVO-DATASET.md](docs/NOVO-DATASET.md)**.
+
+> **Adendo (2026-09-22).** O trabalho sobre o dataset multi-domínio `bigdata_profs`
+> — **[docs/RESULTADOS-BIGDATA-PROFS.md](docs/RESULTADOS-BIGDATA-PROFS.md)** —
+> produziu dois módulos que também elevam o MMH, remedidos sobre as mesmas
+> 1 012 consultas: a fusão linear E5 + TF-IDF (palavra e caractere) como
+> processador leva `basico + e5_tfidf_char_lin + medidas_graphrag` a
+> **R@3 77,0% / MRR 0,683** (contra 67,5% / 0,604 da melhor combinação abaixo),
+> e a correção do extrator de medidas (cadeias de dimensão, `G` como gauge e
+> grama no mesmo perfil) move `basico + e5 + medidas_graphrag` de 67,5% para
+> 68,1%. No **pipeline completo**, a fusão no blocking e no estágio 1, a nova
+> fase [5b] e a adjudicação por LLM em lista levam o MMH de MRR 0,553 / R@3
+> 60,7% (publicado) para **0,677 / 75,2%** com os padrões novos e a mesma LLM,
+> em 9 minutos (`resultados/mmh/etapas/pipeline_final_llm/`; sem LLM: 0,649 /
+> 73,3% em 2 minutos, `pipeline_fusao_sem_llm_sem_cross/`). Os números
+> publicados abaixo são os da execução original e continuam reproduzíveis com
+> `git checkout 7bb1ff4`; a seção 9 do outro documento tem as tabelas completas.
 
 ---
 

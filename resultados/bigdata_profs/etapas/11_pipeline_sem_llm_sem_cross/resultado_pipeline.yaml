@@ -1,0 +1,939 @@
+resumo:
+  n_avaliados: 1375
+  mrr: 0.7504603230681206
+  recall_at_1: 0.6501818181818182
+  recall_at_3: 0.8254545454545454
+  recall_at_5: 0.8807272727272727
+  recall_at_10: 0.9221818181818182
+  recall_blocking: 0.968
+  precisao_at_1: 0.6501818181818182
+  ablacoes:
+    cosseno E5 (só o bi-encoder):
+      n_avaliados: 1375
+      mrr: 0.6760498421614671
+      recall_at_1: 0.5636363636363636
+      recall_at_3: 0.7505454545454545
+      recall_at_5: 0.8181818181818182
+      recall_at_10: 0.8872727272727273
+    fusão E5+TF-IDF (estágio 1):
+      n_avaliados: 1375
+      mrr: 0.7433258535285283
+      recall_at_1: 0.6443636363636364
+      recall_at_3: 0.8189090909090909
+      recall_at_5: 0.8756363636363637
+      recall_at_10: 0.9178181818181819
+    + cross-encoder (estágio 2):
+      n_avaliados: 1375
+      mrr: 0.7433258535285283
+      recall_at_1: 0.6443636363636364
+      recall_at_3: 0.8189090909090909
+      recall_at_5: 0.8756363636363637
+      recall_at_10: 0.9178181818181819
+    + sinais simbólicos (fase 5b):
+      n_avaliados: 1375
+      mrr: 0.7617618461595955
+      recall_at_1: 0.6661818181818182
+      recall_at_3: 0.8363636363636363
+      recall_at_5: 0.8858181818181818
+      recall_at_10: 0.9236363636363636
+    + GraphRAG (fase 6):
+      n_avaliados: 1375
+      mrr: 0.7582103310080806
+      recall_at_1: 0.6610909090909091
+      recall_at_3: 0.8334545454545454
+      recall_at_5: 0.8858181818181818
+      recall_at_10: 0.9236363636363636
+    score final (fase 8):
+      n_avaliados: 1375
+      mrr: 0.7504603230681206
+      recall_at_1: 0.6501818181818182
+      recall_at_3: 0.8254545454545454
+      recall_at_5: 0.8807272727272727
+      recall_at_10: 0.9221818181818182
+amostras_por_confianca:
+  Alta:
+  - codigo_efisco: 116553-4
+    codigo_catmat: '440181'
+    score: 0.8259
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.826 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''BANDEJA USO MEDICO'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.732 x 0.45): fusao=0.680, cosine_e5=0.898, cross=0.680'
+    - '    sinais (+0.05 x 1.040): medidas=1.00, graphrag_idf=0.36, taxonomia=0.26'
+    - '  GraphRAG  (0.732 x 0.2)'
+  - codigo_efisco: 143023-8
+    codigo_catmat: '439208'
+    score: 0.8546
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.855 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''CUBA USO HOSPITALAR'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.776 x 0.45): fusao=0.736, cosine_e5=0.900, cross=0.736'
+    - '    sinais (+0.05 x 0.798): medidas=0.00, graphrag_idf=0.70, taxonomia=0.32'
+    - '  GraphRAG  (0.776 x 0.2)'
+  - codigo_efisco: 147627-0
+    codigo_catmat: '487534'
+    score: 0.8449
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.845 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''FIO DE SUTURA AGULHADO'''
+    - '    Familia ''AGULHA'' — definidoras: calibre, comprimento_valor'
+    - '  Neural    (0.761 x 0.45): fusao=0.714, cosine_e5=0.894, cross=0.714'
+    - '    sinais (+0.05 x 0.941): medidas=0.50, graphrag_idf=0.40, taxonomia=0.79'
+    - '  GraphRAG  (0.761 x 0.2)'
+  - codigo_efisco: 155957-5
+    codigo_catmat: '600278'
+    score: 0.8437
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.844 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''SAPATILHA HOSPITALAR'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.760 x 0.45): fusao=0.729, cosine_e5=0.900, cross=0.729'
+    - '    sinais (+0.05 x 0.614): medidas=0.00, graphrag_idf=0.52, taxonomia=0.30'
+    - '  GraphRAG  (0.760 x 0.2)'
+  - codigo_efisco: 166203-1
+    codigo_catmat: '439208'
+    score: 0.8382
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.838 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''CUBA USO HOSPITALAR'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.751 x 0.45): fusao=0.720, cosine_e5=0.893, cross=0.720'
+    - '    sinais (+0.05 x 0.616): medidas=0.00, graphrag_idf=0.52, taxonomia=0.32'
+    - '  GraphRAG  (0.751 x 0.2)'
+  - codigo_efisco: 166519-7
+    codigo_catmat: '409248'
+    score: 0.8966
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.897 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''BALAO LABORATORIO'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.841 x 0.45): fusao=0.765, cosine_e5=0.910, cross=0.765'
+    - '    sinais (+0.05 x 1.510): medidas=1.00, graphrag_idf=0.83, taxonomia=0.28'
+    - '  GraphRAG  (0.841 x 0.2)'
+  - codigo_efisco: 17681-8
+    codigo_catmat: '436005'
+    score: 0.854
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.854 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''SONDA TRATO URINARIO'''
+    - '    Familia ''SONDA'' — definidoras: calibre, material'
+    - '  Neural    (0.775 x 0.45): fusao=0.692, cosine_e5=0.895, cross=0.692'
+    - '    sinais (+0.05 x 1.667): medidas=1.00, graphrag_idf=0.83, taxonomia=0.79'
+    - '  GraphRAG  (0.775 x 0.2)'
+  - codigo_efisco: 17688-5
+    codigo_catmat: '436002'
+    score: 0.8578
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.858 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''SONDA TRATO URINARIO'''
+    - '    Familia ''SONDA'' — definidoras: calibre, material'
+    - '  Neural    (0.781 x 0.45): fusao=0.698, cosine_e5=0.897, cross=0.698'
+    - '    sinais (+0.05 x 1.667): medidas=1.00, graphrag_idf=0.83, taxonomia=0.79'
+    - '  GraphRAG  (0.781 x 0.2)'
+  - codigo_efisco: 17700-8
+    codigo_catmat: '436015'
+    score: 0.8575
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.858 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''SONDA TRATO URINARIO'''
+    - '    Familia ''SONDA'' — definidoras: calibre, material'
+    - '  Neural    (0.781 x 0.45): fusao=0.697, cosine_e5=0.897, cross=0.697'
+    - '    sinais (+0.05 x 1.667): medidas=1.00, graphrag_idf=0.83, taxonomia=0.79'
+    - '  GraphRAG  (0.781 x 0.2)'
+  - codigo_efisco: 182227-6
+    codigo_catmat: '443020'
+    score: 0.9011
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.901 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''BOLSA PRESSORICA'''
+    - '    Familia ''BOLSA'' — definidoras: volume_valor, material'
+    - '  Neural    (0.848 x 0.45): fusao=0.767, cosine_e5=0.929, cross=0.767'
+    - '    sinais (+0.05 x 1.618): medidas=1.00, graphrag_idf=0.78, taxonomia=0.79'
+    - '  GraphRAG  (0.848 x 0.2)'
+  - codigo_efisco: 190264-4
+    codigo_catmat: '630061'
+    score: 0.8394
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.839 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''MACA CLINICA'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.753 x 0.45): fusao=0.700, cosine_e5=0.885, cross=0.700'
+    - '    sinais (+0.05 x 1.051): medidas=1.00, graphrag_idf=0.21, taxonomia=0.79'
+    - '  GraphRAG  (0.753 x 0.2)'
+  - codigo_efisco: 193047-8
+    codigo_catmat: '428628'
+    score: 0.8637
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.864 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''GORRO HOSPITALAR'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.790 x 0.45): fusao=0.725, cosine_e5=0.904, cross=0.725'
+    - '    sinais (+0.05 x 1.297): medidas=1.00, graphrag_idf=0.61, taxonomia=0.30'
+    - '  GraphRAG  (0.790 x 0.2)'
+  - codigo_efisco: 193070-2
+    codigo_catmat: '438478'
+    score: 0.8169
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.817 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''DRENO CIRURGICO'''
+    - '    Familia ''DRENO'' — definidoras: material, calibre'
+    - '  Neural    (0.718 x 0.45): fusao=0.696, cosine_e5=0.893, cross=0.696'
+    - '    sinais (+0.05 x 0.447): medidas=0.00, graphrag_idf=0.21, taxonomia=0.79'
+    - '  GraphRAG  (0.718 x 0.2)'
+  - codigo_efisco: 193217-9
+    codigo_catmat: '487675'
+    score: 0.8354
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.835 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''FIO DE SUTURA AGULHADO'''
+    - '    Familia ''AGULHA'' — definidoras: calibre, comprimento_valor'
+    - '  Neural    (0.740 x 0.45): fusao=0.702, cosine_e5=0.896, cross=0.702'
+    - '    sinais (+0.05 x 0.760): medidas=0.50, graphrag_idf=0.22, taxonomia=0.79'
+    - '  GraphRAG  (0.762 x 0.2)'
+  - codigo_efisco: 194403-7
+    codigo_catmat: '484847'
+    score: 0.8496
+    deducao: equivalenteA
+    trilha:
+    - score_final=0.850 -> Alta  (rank 1)
+    - '  Ontologia (1.000 x 0.35): equivalenteA'
+    - '    Deduzido pelo reasoner (SWRL, regra 2.2):'
+    - '    PDM coincide: ''CURATIVO / COBERTURA'''
+    - '    Familia '''' — definidoras: (nenhuma)'
+    - '  Neural    (0.769 x 0.45): fusao=0.716, cosine_e5=0.889, cross=0.716'
+    - '    sinais (+0.05 x 1.047): medidas=0.50, graphrag_idf=0.65, taxonomia=0.34'
+    - '  GraphRAG  (0.769 x 0.2)'
+  Média:
+  - codigo_efisco: 100292-9
+    codigo_catmat: '438058'
+    score: 0.5605
+    deducao: incompleto
+    trilha:
+    - score_final=0.560 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.701 x 0.45): fusao=0.661, cosine_e5=0.878, cross=0.661'
+    - '    sinais (+0.05 x 0.789): medidas=0.00, graphrag_idf=0.55, taxonomia=0.80'
+    - '  GraphRAG  (0.701 x 0.2)'
+  - codigo_efisco: 100650-9
+    codigo_catmat: '357311'
+    score: 0.6179
+    deducao: incompleto
+    trilha:
+    - score_final=0.618 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.789 x 0.45): fusao=0.763, cosine_e5=0.886, cross=0.763'
+    - '    sinais (+0.05 x 0.528): medidas=0.00, graphrag_idf=0.26, taxonomia=0.88'
+    - '  GraphRAG  (0.789 x 0.2)'
+  - codigo_efisco: 100659-2
+    codigo_catmat: '340906'
+    score: 0.6399
+    deducao: incompleto
+    trilha:
+    - score_final=0.640 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.823 x 0.45): fusao=0.765, cosine_e5=0.897, cross=0.765'
+    - '    sinais (+0.05 x 1.165): medidas=1.00, graphrag_idf=0.30, taxonomia=0.88'
+    - '  GraphRAG  (0.823 x 0.2)'
+  - codigo_efisco: 102512-0
+    codigo_catmat: '301468'
+    score: 0.6294
+    deducao: incompleto
+    trilha:
+    - score_final=0.629 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.807 x 0.45): fusao=0.759, cosine_e5=0.921, cross=0.759'
+    - '    sinais (+0.05 x 0.958): medidas=0.50, graphrag_idf=0.60, taxonomia=0.19'
+    - '  GraphRAG  (0.807 x 0.2)'
+  - codigo_efisco: 103674-2
+    codigo_catmat: '318871'
+    score: 0.6218
+    deducao: incompleto
+    trilha:
+    - score_final=0.622 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.795 x 0.45): fusao=0.770, cosine_e5=0.889, cross=0.770'
+    - '    sinais (+0.05 x 0.506): medidas=0.00, graphrag_idf=0.27, taxonomia=0.79'
+    - '  GraphRAG  (0.795 x 0.2)'
+  - codigo_efisco: 103754-4
+    codigo_catmat: '439887'
+    score: 0.5891
+    deducao: incompleto
+    trilha:
+    - score_final=0.589 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.745 x 0.45): fusao=0.714, cosine_e5=0.882, cross=0.714'
+    - '    sinais (+0.05 x 0.615): medidas=0.00, graphrag_idf=0.38, taxonomia=0.79'
+    - '  GraphRAG  (0.745 x 0.2)'
+  - codigo_efisco: 108054-7
+    codigo_catmat: '449477'
+    score: 0.5625
+    deducao: incompleto
+    trilha:
+    - score_final=0.562 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.704 x 0.45): fusao=0.671, cosine_e5=0.871, cross=0.671'
+    - '    sinais (+0.05 x 0.676): medidas=0.50, graphrag_idf=0.14, taxonomia=0.79'
+    - '  GraphRAG  (0.702 x 0.2)'
+  - codigo_efisco: 108865-3
+    codigo_catmat: '437298'
+    score: 0.5871
+    deducao: incompleto
+    trilha:
+    - score_final=0.587 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.742 x 0.45): fusao=0.690, cosine_e5=0.905, cross=0.690'
+    - '    sinais (+0.05 x 1.036): medidas=0.67, graphrag_idf=0.40, taxonomia=0.80'
+    - '  GraphRAG  (0.742 x 0.2)'
+  - codigo_efisco: 110905-7
+    codigo_catmat: '619857'
+    score: 0.5697
+    deducao: incompleto
+    trilha:
+    - score_final=0.570 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.715 x 0.45): fusao=0.684, cosine_e5=0.891, cross=0.684'
+    - '    sinais (+0.05 x 0.628): medidas=0.00, graphrag_idf=0.54, taxonomia=0.30'
+    - '  GraphRAG  (0.715 x 0.2)'
+  - codigo_efisco: 113416-7
+    codigo_catmat: '433745'
+    score: 0.5938
+    deducao: incompleto
+    trilha:
+    - score_final=0.594 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.752 x 0.45): fusao=0.729, cosine_e5=0.875, cross=0.729'
+    - '    sinais (+0.05 x 0.454): medidas=0.00, graphrag_idf=0.32, taxonomia=0.46'
+    - '  GraphRAG  (0.752 x 0.2)'
+  - codigo_efisco: 113724-7
+    codigo_catmat: '372671'
+    score: 0.5943
+    deducao: incompleto
+    trilha:
+    - score_final=0.594 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.753 x 0.45): fusao=0.710, cosine_e5=0.869, cross=0.710'
+    - '    sinais (+0.05 x 0.856): medidas=0.00, graphrag_idf=0.57, taxonomia=0.96'
+    - '  GraphRAG  (0.753 x 0.2)'
+  - codigo_efisco: 113877-4
+    codigo_catmat: '627261'
+    score: 0.5393
+    deducao: incompleto
+    trilha:
+    - score_final=0.539 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.668 x 0.45): fusao=0.662, cosine_e5=0.886, cross=0.662'
+    - '    sinais (+0.05 x 0.124): medidas=0.00, graphrag_idf=0.00, taxonomia=0.41'
+    - '  GraphRAG  (0.668 x 0.2)'
+  - codigo_efisco: 114166-0
+    codigo_catmat: '479657'
+    score: 0.5585
+    deducao: incompleto
+    trilha:
+    - score_final=0.558 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.696 x 0.45): fusao=0.666, cosine_e5=0.867, cross=0.666'
+    - '    sinais (+0.05 x 0.595): medidas=0.00, graphrag_idf=0.36, taxonomia=0.79'
+    - '  GraphRAG  (0.701 x 0.2)'
+  - codigo_efisco: 117685-4
+    codigo_catmat: '293586'
+    score: 0.5425
+    deducao: incompleto
+    trilha:
+    - score_final=0.542 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.673 x 0.45): fusao=0.645, cosine_e5=0.864, cross=0.645'
+    - '    sinais (+0.05 x 0.558): medidas=0.50, graphrag_idf=0.26, taxonomia=0.00'
+    - '  GraphRAG  (0.673 x 0.2)'
+  - codigo_efisco: 118476-8
+    codigo_catmat: '604944'
+    score: 0.5907
+    deducao: incompleto
+    trilha:
+    - score_final=0.591 -> Média  (rank 1)
+    - '  Ontologia (0.300 x 0.35): incompleto'
+    - '    Reasoner não fechou equivalência e não há conflito de característica definidora
+      (atributos ausentes).'
+    - '  Neural    (0.747 x 0.45): fusao=0.708, cosine_e5=0.889, cross=0.708'
+    - '    sinais (+0.05 x 0.788): medidas=0.50, graphrag_idf=0.40, taxonomia=0.30'
+    - '  GraphRAG  (0.747 x 0.2)'
+  Baixa:
+  - codigo_efisco: 12781-7
+    codigo_catmat: '600107'
+    score: 0.131725
+    deducao: veto
+    trilha:
+    - score_final=0.132 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''3.5''  x  CATMAT = ''150'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.811 x 0.45): fusao=0.762, cosine_e5=0.922, cross=0.762'
+    - '    sinais (+0.05 x 0.975): medidas=0.50, graphrag_idf=0.44, taxonomia=0.79'
+    - '  GraphRAG  (0.811 x 0.2)'
+  - codigo_efisco: 149179-2
+    codigo_catmat: '602258'
+    score: 0.132475
+    deducao: veto
+    trilha:
+    - score_final=0.132 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''4''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.815 x 0.45): fusao=0.747, cosine_e5=0.915, cross=0.747'
+    - '    sinais (+0.05 x 1.371): medidas=1.00, graphrag_idf=0.53, taxonomia=0.79'
+    - '  GraphRAG  (0.815 x 0.2)'
+  - codigo_efisco: 155732-7
+    codigo_catmat: '487522'
+    score: 0.118325
+    deducao: veto
+    trilha:
+    - score_final=0.118 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.727 x 0.45): fusao=0.684, cosine_e5=0.893, cross=0.684'
+    - '    sinais (+0.05 x 0.861): medidas=0.50, graphrag_idf=0.32, taxonomia=0.79'
+    - '  GraphRAG  (0.730 x 0.2)'
+  - codigo_efisco: 155841-2
+    codigo_catmat: '487002'
+    score: 0.129425
+    deducao: veto
+    trilha:
+    - score_final=0.129 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''3.5''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.796 x 0.45): fusao=0.748, cosine_e5=0.918, cross=0.748'
+    - '    sinais (+0.05 x 0.975): medidas=0.50, graphrag_idf=0.44, taxonomia=0.79'
+    - '  GraphRAG  (0.796 x 0.2)'
+  - codigo_efisco: 179085-4
+    codigo_catmat: '602258'
+    score: 0.131975
+    deducao: veto
+    trilha:
+    - score_final=0.132 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''1.5''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.812 x 0.45): fusao=0.742, cosine_e5=0.915, cross=0.742'
+    - '    sinais (+0.05 x 1.401): medidas=1.00, graphrag_idf=0.56, taxonomia=0.79'
+    - '  GraphRAG  (0.812 x 0.2)'
+  - codigo_efisco: 179088-9
+    codigo_catmat: '486937'
+    score: 0.132525
+    deducao: veto
+    trilha:
+    - score_final=0.133 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''1.5''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.816 x 0.45): fusao=0.746, cosine_e5=0.917, cross=0.746'
+    - '    sinais (+0.05 x 1.401): medidas=1.00, graphrag_idf=0.56, taxonomia=0.79'
+    - '  GraphRAG  (0.816 x 0.2)'
+  - codigo_efisco: 183947-0
+    codigo_catmat: '487551'
+    score: 0.12175
+    deducao: veto
+    trilha:
+    - score_final=0.122 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2.5''  x  CATMAT = ''45'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.746 x 0.45): fusao=0.693, cosine_e5=0.917, cross=0.693'
+    - '    sinais (+0.05 x 1.072): medidas=1.00, graphrag_idf=0.23, taxonomia=0.79'
+    - '  GraphRAG  (0.756 x 0.2)'
+  - codigo_efisco: 188721-1
+    codigo_catmat: '487248'
+    score: 0.119175
+    deducao: veto
+    trilha:
+    - score_final=0.119 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''1.9''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.733 x 0.45): fusao=0.687, cosine_e5=0.886, cross=0.687'
+    - '    sinais (+0.05 x 0.931): medidas=0.50, graphrag_idf=0.39, taxonomia=0.79'
+    - '  GraphRAG  (0.733 x 0.2)'
+  - codigo_efisco: 190244-0
+    codigo_catmat: '604834'
+    score: 0.133025
+    deducao: veto
+    trilha:
+    - score_final=0.133 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2.5''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.819 x 0.45): fusao=0.756, cosine_e5=0.904, cross=0.756'
+    - '    sinais (+0.05 x 1.260): medidas=1.00, graphrag_idf=0.42, taxonomia=0.79'
+    - '  GraphRAG  (0.819 x 0.2)'
+  - codigo_efisco: 192502-4
+    codigo_catmat: '487112'
+    score: 0.132975
+    deducao: veto
+    trilha:
+    - score_final=0.133 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2.5''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.818 x 0.45): fusao=0.753, cosine_e5=0.919, cross=0.753'
+    - '    sinais (+0.05 x 1.310): medidas=1.00, graphrag_idf=0.47, taxonomia=0.79'
+    - '  GraphRAG  (0.818 x 0.2)'
+  - codigo_efisco: 192503-2
+    codigo_catmat: '487112'
+    score: 0.1332
+    deducao: veto
+    trilha:
+    - score_final=0.133 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.820 x 0.45): fusao=0.752, cosine_e5=0.918, cross=0.752'
+    - '    sinais (+0.05 x 1.344): medidas=1.00, graphrag_idf=0.51, taxonomia=0.79'
+    - '  GraphRAG  (0.820 x 0.2)'
+  - codigo_efisco: 193018-4
+    codigo_catmat: '487248'
+    score: 0.129875
+    deducao: veto
+    trilha:
+    - score_final=0.130 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2.5''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.799 x 0.45): fusao=0.738, cosine_e5=0.910, cross=0.738'
+    - '    sinais (+0.05 x 1.221): medidas=1.00, graphrag_idf=0.38, taxonomia=0.79'
+    - '  GraphRAG  (0.799 x 0.2)'
+  - codigo_efisco: 193280-2
+    codigo_catmat: '616720'
+    score: 0.12695
+    deducao: veto
+    trilha:
+    - score_final=0.127 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.781 x 0.45): fusao=0.728, cosine_e5=0.901, cross=0.728'
+    - '    sinais (+0.05 x 1.065): medidas=1.00, graphrag_idf=0.23, taxonomia=0.79'
+    - '  GraphRAG  (0.781 x 0.2)'
+  - codigo_efisco: 194089-9
+    codigo_catmat: '487020'
+    score: 0.130975
+    deducao: veto
+    trilha:
+    - score_final=0.131 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''9''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.806 x 0.45): fusao=0.752, cosine_e5=0.914, cross=0.752'
+    - '    sinais (+0.05 x 1.077): medidas=0.50, graphrag_idf=0.54, taxonomia=0.79'
+    - '  GraphRAG  (0.806 x 0.2)'
+  - codigo_efisco: 194090-2
+    codigo_catmat: '486999'
+    score: 0.130075
+    deducao: veto
+    trilha:
+    - score_final=0.130 -> Baixa  (rank 1)
+    - '  Ontologia (0.000 x 0.35): veto'
+    - '    Conflito na caracteristica definidora [comprimento_valor]:'
+    - '      e-Fisco = ''2.5''  x  CATMAT = ''70'''
+    - '    Veto por inconsistencia (checagem, nao deducao SWRL).'
+    - '  Neural    (0.800 x 0.45): fusao=0.753, cosine_e5=0.915, cross=0.753'
+    - '    sinais (+0.05 x 0.952): medidas=0.50, graphrag_idf=0.41, taxonomia=0.79'
+    - '  GraphRAG  (0.800 x 0.2)'
+duplicatas:
+- codigo_catmat: '438982'
+  n_itens_efisco: 5
+  codigos_efisco:
+  - 156628-8
+  - 156620-2
+  - 156625-3
+  - 156617-2
+  - 156619-9
+- codigo_catmat: '446106'
+  n_itens_efisco: 5
+  codigos_efisco:
+  - 590205-3
+  - 602909-4
+  - 590243-6
+  - 510570-6
+  - 527900-3
+- codigo_catmat: '354230'
+  n_itens_efisco: 5
+  codigos_efisco:
+  - 597892-0
+  - 597888-2
+  - 567613-4
+  - 597900-5
+  - 598304-5
+- codigo_catmat: '466531'
+  n_itens_efisco: 4
+  codigos_efisco:
+  - 199077-2
+  - 189158-8
+  - 189159-6
+  - 218123-1
+- codigo_catmat: '428820'
+  n_itens_efisco: 4
+  codigos_efisco:
+  - 197855-1
+  - 197858-6
+  - 197860-8
+  - 197864-0
+- codigo_catmat: '451214'
+  n_itens_efisco: 4
+  codigos_efisco:
+  - 181949-6
+  - 181920-8
+  - 181954-2
+  - 181921-6
+- codigo_catmat: '619331'
+  n_itens_efisco: 4
+  codigos_efisco:
+  - 303702-9
+  - 303707-0
+  - 303706-1
+  - 303708-8
+- codigo_catmat: '229920'
+  n_itens_efisco: 4
+  codigos_efisco:
+  - 493083-5
+  - 493092-4
+  - 493122-0
+  - 516148-7
+- codigo_catmat: '624915'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 190241-5
+  - 229092-8
+  - 229094-4
+- codigo_catmat: '451214'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 161973-0
+  - 35706-5
+  - 35742-1
+- codigo_catmat: '481967'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 525569-4
+  - 371411-0
+  - 525558-9
+- codigo_catmat: '405018'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 530374-5
+  - 287776-7
+  - 518110-0
+- codigo_catmat: '446098'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 553579-4
+  - 530535-7
+  - 352547-3
+- codigo_catmat: '449477'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 124804-9
+  - 41912-5
+  - 108054-7
+- codigo_catmat: '623645'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 609941-6
+  - 487093-0
+  - 487374-2
+- codigo_catmat: '628378'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 470750-8
+  - 12907-0
+  - 30707-6
+- codigo_catmat: '487236'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 475490-5
+  - 419810-7
+  - 199035-7
+- codigo_catmat: '445872'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 513893-0
+  - 239066-3
+  - 485603-1
+- codigo_catmat: '439208'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 242083-0
+  - 143023-8
+  - 166203-1
+- codigo_catmat: '428616'
+  n_itens_efisco: 3
+  codigos_efisco:
+  - 126616-0
+  - 281773-0
+  - 618925-3
+anomalias_para_curadoria:
+- codigo_efisco: 108054-7
+  predito: '449477'
+  esperado:
+  - '438470'
+  score: 0.5625
+  confianca: Média
+- codigo_efisco: 113416-7
+  predito: '433745'
+  esperado:
+  - '399982'
+  score: 0.5938
+  confianca: Média
+- codigo_efisco: 114166-0
+  predito: '479657'
+  esperado:
+  - '479659'
+  score: 0.5585
+  confianca: Média
+- codigo_efisco: 117685-4
+  predito: '293586'
+  esperado:
+  - '405917'
+  score: 0.5425
+  confianca: Média
+- codigo_efisco: 12035-9
+  predito: '236227'
+  esperado:
+  - '462532'
+  score: 0.5263
+  confianca: Média
+- codigo_efisco: 124804-9
+  predito: '449477'
+  esperado:
+  - '619341'
+  score: 0.5563
+  confianca: Média
+- codigo_efisco: 126616-0
+  predito: '428616'
+  esperado:
+  - '428620'
+  score: 0.5629
+  confianca: Média
+- codigo_efisco: 12907-0
+  predito: '628378'
+  esperado:
+  - '628398'
+  score: 0.5453
+  confianca: Média
+- codigo_efisco: 133102-7
+  predito: '439939'
+  esperado:
+  - '626616'
+  score: 0.6161
+  confianca: Média
+- codigo_efisco: 133453-0
+  predito: '482005'
+  esperado:
+  - '481972'
+  score: 0.5949
+  confianca: Média
+- codigo_efisco: 13568-2
+  predito: '620091'
+  esperado:
+  - '620089'
+  score: 0.5631
+  confianca: Média
+- codigo_efisco: 13838-0
+  predito: '432472'
+  esperado:
+  - '434825'
+  score: 0.605
+  confianca: Média
+- codigo_efisco: 142695-8
+  predito: '480569'
+  esperado:
+  - '445576'
+  score: 0.544
+  confianca: Média
+- codigo_efisco: 143023-8
+  predito: '439208'
+  esperado:
+  - '478661'
+  score: 0.8546
+  confianca: Alta
+- codigo_efisco: 147627-0
+  predito: '487534'
+  esperado:
+  - '487529'
+  score: 0.8449
+  confianca: Alta
+- codigo_efisco: 148092-8
+  predito: '605111'
+  esperado:
+  - '10030'
+  score: 0.5523
+  confianca: Média
+- codigo_efisco: 148806-6
+  predito: '10030'
+  esperado:
+  - '479542'
+  score: 0.5314
+  confianca: Média
+- codigo_efisco: 149179-2
+  predito: '602258'
+  esperado:
+  - '487020'
+  score: 0.132475
+  confianca: Baixa
+- codigo_efisco: 151108-4
+  predito: '431930'
+  esperado:
+  - '431929'
+  score: 0.5526
+  confianca: Média
+- codigo_efisco: 151397-4
+  predito: '353696'
+  esperado:
+  - '337768'
+  score: 0.5391
+  confianca: Média
+- codigo_efisco: 152390-2
+  predito: '415484'
+  esperado:
+  - '13510'
+  score: 0.5557
+  confianca: Média
+- codigo_efisco: 153735-0
+  predito: '381391'
+  esperado:
+  - '339560'
+  score: 0.5489
+  confianca: Média
+- codigo_efisco: 155415-8
+  predito: '328078'
+  esperado:
+  - '448285'
+  score: 0.6005
+  confianca: Média
+- codigo_efisco: 155706-8
+  predito: '487624'
+  esperado:
+  - '487642'
+  score: 0.5913
+  confianca: Média
+- codigo_efisco: 155732-7
+  predito: '487522'
+  esperado:
+  - '487516'
+  score: 0.118325
+  confianca: Baixa
+- codigo_efisco: 155885-4
+  predito: '487112'
+  esperado:
+  - '487067'
+  score: 0.5854
+  confianca: Média
+- codigo_efisco: 155952-4
+  predito: '454313'
+  esperado:
+  - '436868'
+  score: 0.5364
+  confianca: Média
+- codigo_efisco: 155957-5
+  predito: '600278'
+  esperado:
+  - '479671'
+  score: 0.8437
+  confianca: Alta
+- codigo_efisco: 156255-0
+  predito: '487386'
+  esperado:
+  - '487429'
+  score: 0.6347
+  confianca: Média
+- codigo_efisco: 156617-2
+  predito: '438982'
+  esperado:
+  - '438401'
+  score: 0.5902
+  confianca: Média

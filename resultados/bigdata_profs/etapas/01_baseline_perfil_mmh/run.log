@@ -1,0 +1,68 @@
+INFO | Dataset: bigdata_profs | perfil: mmh
+INFO | Corpus [bigdata_profs]: 1375 consultas x 1297 itens de catálogo (1375 com gabarito).
+INFO | Grade: 2 pré × 2 proc × 7 pós = 28 combinações.
+INFO |   nada           | tfidf     | nada      -> MRR 0.5544  R@1 0.437  R@3 0.627
+INFO |   nada           | tfidf     | unidades  -> MRR 0.5611  R@1 0.442  R@3 0.636
+INFO |   nada           | tfidf     | pdm       -> MRR 0.5508  R@1 0.430  R@3 0.625
+INFO | [GraphRAG/pré] KG: 12380 nós, 32261 arestas, 9708 entidades, 98 comunidades
+INFO |   nada           | tfidf     | graphrag  -> MRR 0.5797  R@1 0.468  R@3 0.655
+INFO |   nada           | tfidf     | unidades_graphrag -> MRR 0.5895  R@1 0.478  R@3 0.666
+INFO | [pós/medidas] consultas com medida: 760/1375 | catálogo: 639/1297 | bases: MM=653, ML=181, G_GAUGE=49, FR=40
+INFO |   nada           | tfidf     | medidas   -> MRR 0.5743  R@1 0.460  R@3 0.641
+INFO |   nada           | tfidf     | medidas_graphrag -> MRR 0.5765  R@1 0.460  R@3 0.650
+INFO | No device provided, using cpu
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 1375 consultas + 1297 itens (pré=nada)...
+INFO |   nada           | e5        | nada      -> MRR 0.6748  R@1 0.569  R@3 0.740
+INFO |   nada           | e5        | unidades  -> MRR 0.6697  R@1 0.556  R@3 0.745
+INFO |   nada           | e5        | pdm       -> MRR 0.5949  R@1 0.468  R@3 0.673
+INFO |   nada           | e5        | graphrag  -> MRR 0.6338  R@1 0.510  R@3 0.708
+INFO |   nada           | e5        | unidades_graphrag -> MRR 0.6804  R@1 0.570  R@3 0.754
+INFO |   nada           | e5        | medidas   -> MRR 0.6715  R@1 0.561  R@3 0.741
+INFO |   nada           | e5        | medidas_graphrag -> MRR 0.7022  R@1 0.601  R@3 0.768
+INFO |   basico         | tfidf     | nada      -> MRR 0.6506  R@1 0.535  R@3 0.727
+INFO |   basico         | tfidf     | unidades  -> MRR 0.6435  R@1 0.525  R@3 0.724
+INFO |   basico         | tfidf     | pdm       -> MRR 0.6141  R@1 0.486  R@3 0.692
+INFO |   basico         | tfidf     | graphrag  -> MRR 0.6641  R@1 0.557  R@3 0.735
+INFO |   basico         | tfidf     | unidades_graphrag -> MRR 0.6686  R@1 0.556  R@3 0.749
+INFO |   basico         | tfidf     | medidas   -> MRR 0.6696  R@1 0.561  R@3 0.737
+INFO |   basico         | tfidf     | medidas_graphrag -> MRR 0.6713  R@1 0.559  R@3 0.749
+INFO | No device provided, using cpu
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 1375 consultas + 1297 itens (pré=basico)...
+INFO |   basico         | e5        | nada      -> MRR 0.6689  R@1 0.562  R@3 0.743
+INFO |   basico         | e5        | unidades  -> MRR 0.6480  R@1 0.527  R@3 0.738
+INFO |   basico         | e5        | pdm       -> MRR 0.5976  R@1 0.473  R@3 0.676
+INFO |   basico         | e5        | graphrag  -> MRR 0.6314  R@1 0.510  R@3 0.716
+INFO |   basico         | e5        | unidades_graphrag -> MRR 0.6614  R@1 0.544  R@3 0.755
+INFO |   basico         | e5        | medidas   -> MRR 0.6615  R@1 0.546  R@3 0.748
+INFO |   basico         | e5        | medidas_graphrag -> MRR 0.6928  R@1 0.585  R@3 0.777
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                         tfidf            e5
+nada                    0.6269       0.7404*
+basico                 0.7265*       0.7425*
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   basico + e5 + medidas_graphrag                    0.7775   0.585   0.777   0.882   394.1
+2   nada + e5 + medidas_graphrag                      0.7680   0.601   0.768   0.895   657.8
+3   basico + e5 + unidades_graphrag                   0.7549   0.544   0.755   0.876   394.1
+4   nada + e5 + unidades_graphrag                     0.7542   0.570   0.754   0.889   657.9
+5   basico + tfidf + unidades_graphrag                0.7491   0.556   0.749   0.884     2.7
+6   basico + tfidf + medidas_graphrag                 0.7491   0.559   0.749   0.884     2.6
+7   basico + e5 + medidas                             0.7476   0.546   0.748   0.874   394.1
+8   nada + e5 + unidades                              0.7447   0.556   0.745   0.884   657.8
+9   basico + e5 + nada                                0.7425   0.562   0.743   0.869   394.0
+10  nada + e5 + medidas                               0.7411   0.561   0.741   0.885   657.8
+
+=== ARQUIVOS GERADOS ===
+  C:\Users\Educação\mmh\resultados\bigdata_profs\avaliacao_modular.yaml
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_pre_x_proc.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\ranking_combinacoes.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_modular.png
+
+Tempo total: 1072.3s

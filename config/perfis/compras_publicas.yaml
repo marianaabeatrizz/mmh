@@ -1,0 +1,198 @@
+# Perfil de domínio: compras públicas MULTI-DOMÍNIO
+#
+# Para corpora que misturam material médico-hospitalar com medicamentos,
+# mobiliário, papelaria, alimentos, informática, limpeza etc. — o caso do dataset
+# `bigdata_profs`, em que ~72% dos pares são de saúde e o resto se espalha por
+# 40+ grupos do e-Fisco.
+#
+# HERDA do perfil `mmh` (ver `herda:` abaixo, resolvido em config.py): todo o
+# léxico curado de MMH — boilerplate jurídico do e-Fisco, abreviações, variantes
+# ortográficas, gauge/french, famílias, esquema de atributos — vale aqui sem ser
+# copiado. Este arquivo só acrescenta o que o MMH deixa de fora DE PROPÓSITO e
+# que este corpus precisa:
+#
+#   massa e dose      — G, KG, MG, MCG com aliases: 500 MG de paracetamol,
+#                       50 G de um alimento. No MMH, "G" era só gauge; aqui o
+#                       extrator lê "16 G" como calibre (faixa 5-34, inteiro) e
+#                       "500 G" como massa, porque o padrão mais restrito lê
+#                       primeiro (caracteristicas.padroes).
+#   concentração      — MG/ML e %: é o que distingue medicamentos e soluções
+#                       de limpeza dentro do mesmo PDM.
+#   unidade biológica — UI (insulina, heparina).
+#   elétrica          — W e V (equipamentos, informática).
+#
+# Nada de fator de conversão inventado: MG->G e MCG->G são do SI; %, UI, W, V e
+# MG/ML entram com base própria e comparam por igualdade dentro da tolerância.
+#
+# Números do MMH NÃO mudam com este arquivo: o perfil `mmh` continua intacto.
+
+herda: mmh
+
+nome: compras_publicas
+descricao: compras públicas (Brasil) — material hospitalar, medicamentos e bens de uso geral
+prefixo: cp
+
+# IRIs próprios em branco: a ontologia sai sob um IRI local com o nome do dataset.
+iri_ontologia: ""
+iri_lexico: ""
+versao_lexico: '2.1'
+
+lexico:
+  # Sem PDM em foco fixo (o MMH aponta AGULHA PUNCAO OSSEA): a visualização da
+  # fase [1] usa o PDM mais frequente deste corpus.
+  pdm_foco_exemplo: ""
+
+llm:
+  especialista: Especialista em catálogos de compras públicas do Brasil (saúde e bens de uso geral).
+  auditor: Voce e um auditor de compras publicas (Brasil), habituado a material hospitalar, medicamentos e bens de uso geral.
+  auditor_curto: um auditor de compras públicas
+
+unidades:
+  # --- massa e dose -------------------------------------------------------
+  # Declaradas de novo (o merge é recursivo, então só `aliases`/`faixa` mudam).
+  # `faixa` mínima de 0,001 g para não ler "0 G"; sem teto.
+  G:
+    categoria: massa
+    base: G
+    aliases: [G, GR, GRAMA, GRAMAS]
+  KG:
+    categoria: massa
+    base: G
+    fator_para_base: 1000.0
+    aliases: [KG, QUILO, QUILOS, QUILOGRAMA, QUILOGRAMAS]
+  MG:
+    categoria: massa
+    base: G
+    fator_para_base: 0.001
+    aliases: [MG, MILIGRAMA, MILIGRAMAS]
+  MCG:
+    categoria: massa
+    base: G
+    fator_para_base: 0.000001
+    aliases: [MCG, MICROGRAMA, MICROGRAMAS, UG]
+
+  # --- concentração --------------------------------------------------------
+  # Alias mais longo lê antes do mais curto, então "50 MG/ML" é concentração e
+  # não uma massa de 50 mg seguida de lixo.
+  MG_ML:
+    categoria: concentracao
+    base: MG_ML
+    aliases: [MG/ML, MG / ML, MG POR ML]
+  PCT:
+    categoria: concentracao
+    base: PCT
+    aliases: ['%', PORCENTO, POR CENTO]
+
+  # --- unidade biológica ---------------------------------------------------
+  UI:
+    categoria: atividade
+    base: UI
+    aliases: [UI, U.I., UNIDADES INTERNACIONAIS]
+
+  # --- elétrica ------------------------------------------------------------
+  W:
+    categoria: potencia
+    base: W
+    aliases: [W, WATTS, WATT]
+  V:
+    categoria: tensao
+    base: V
+    aliases: [V, VOLTS, VOLT]
+
+# Esquema de atributos para a extração da fase [2] e a ontologia da fase [4].
+# Os nove do MMH continuam (herança); estes são os que o rótulo CATMAT deste
+# corpus mais usa fora do material hospitalar — medicamento, mobiliário,
+# eletro, alimento — lidos das chaves mais frequentes do próprio catálogo
+# (MATERIAL 602, TIPO 408, APLICAÇÃO 363, TAMANHO 162, COR 126, CONCENTRAÇÃO 81,
+# CAPACIDADE 66, DOSAGEM 59...). O merge é recursivo: chave nova entra, chave
+# repetida do MMH não é alterada.
+atributos:
+  principio_ativo:
+    descricao: substância ativa de medicamento, MAIÚSCULAS, ex "PARACETAMOL", "DIPIRONA SODICA"
+    tipo: texto
+  concentracao:
+    descricao: dose/concentração com unidade, ex "500 MG", "50 MG/ML", "0,9 %"
+    tipo: texto
+  forma_farmaceutica:
+    descricao: ex "COMPRIMIDO", "SOLUCAO INJETAVEL", "CAPSULA", "POMADA"
+    tipo: texto
+  aplicacao:
+    descricao: para que serve / onde se usa, ex "HEMOCULTURA", "PAREDE", "ENSINO INFANTIL"
+    tipo: texto
+  tipo:
+    descricao: subtipo ou modelo do produto, ex "BELICHE", "PEDAL", "TABULEIRO"
+    tipo: texto
+  tamanho:
+    descricao: tamanho nominal quando não é medida, ex "G", "ADULTO", "N 4"
+    tipo: texto
+  cor:
+    descricao: ex "BRANCA", "AZUL", "TRANSPARENTE"
+    tipo: texto
+  capacidade:
+    descricao: capacidade com unidade, ex "25 L", "500 ML", "5 KG"
+    tipo: texto
+  tensao:
+    descricao: tensão elétrica, ex "220 V", "BIVOLT"
+    tipo: texto
+  potencia:
+    descricao: potência elétrica, ex "9 W", "1500 W"
+    tipo: texto
+
+# Características definidoras de famílias fora da saúde (regra SWRL da fase [4]
+# e shapes SHACL da fase [2]). As do MMH continuam pela herança.
+atributos_definidores:
+  MEDICAMENTO:
+  - principio_ativo
+  - concentracao
+  DIETA:
+  - volume_valor
+  CAMA:
+  - material
+  - dimensao
+  CADEIRA:
+  - material
+  MESA:
+  - material
+  - dimensao
+  LIXEIRA:
+  - capacidade
+  LAMPADA:
+  - potencia
+  - tensao
+
+# Famílias adicionais para o blocking por subsunção (fase [3]) — as do MMH
+# continuam valendo pela herança. Aqui só os núcleos frequentes fora da saúde.
+familias:
+- AGULHA
+- SERINGA
+- CATETER
+- SONDA
+- FIO
+- EQUIPO
+- LUVA
+- TUBO
+- DRENO
+- MASCARA
+- COMPRESSA
+- ATADURA
+- CURATIVO
+- DIETA
+- REAGENTE
+- CADEIRA
+- MESA
+- ARMARIO
+- CAMA
+- PAPEL
+- CANETA
+- BRINQUEDO
+- LIXEIRA
+- LAMPADA
+- MEDICAMENTO
+
+medidas:
+  # Regex do pós-processador `unidades` (o textual, sem conversão). Estende a do
+  # MMH com os aliases novos. O sinal `medidas` (com conversão) não usa esta
+  # regex: monta os padrões da tabela `unidades` acima.
+  regex: (\d+(?:[\.,]\d+)?)\s*(MG/ML|MM|CM|ML|MCG|MG|KG|UI|POL|FR|CH|LITROS?|L|G|W|V|%)
+  regex_calibre: \b(\d{1,2})\s*G(?:A|AUGE)?\b
+  rotulo_calibre: G_CALIBRE

@@ -1,0 +1,49 @@
+=== [5b] SINAIS SIMBÓLICOS ===
+  Consultas com medida    : 1015 / 1375  (catálogo 865 / 1297)
+  KG                      : 15442 nós, 8572 entidades, 38 comunidades
+  Taxonomia (LOO)         : correto compatível em 91.8% das consultas; 133 classes sem histórico
+  Dedução ontológica      : 482 pares com equivalenteA/broadMatch entre os 27500 do top-K
+  Pares com algum sinal   : 25073 / 27500
+  Pesos                   : 0.05 x {'medidas': 0.6, 'graphrag_idf': 1.0, 'taxonomia': 0.3, 'ontologia': 0.0}
+
+=== [6] GRAPHRAG (adjudicação) ===
+  Indice Microsoft        : não usado
+  Arestas grafo TF-IDF    : 2440
+  Zona cinzenta (margem)  : 930 consultas
+  Adjudicacao             : modo nenhuma | LLM 0 | votacao 449
+  Ajuste medio de score   : 0.0088
+
+=== [8] CONFIANÇA ===
+  Pares ranqueados        : 27500
+  Consultas com decisão   : 1375
+  Score final médio (top1): 0.746
+  Alta                   :   446  (32.4%)
+  Média                  :   295  (21.5%)
+  Baixa                  :   634  (46.1%)
+
+=== [*] AVALIAÇÃO DE RETRIEVAL ===
+  Consultas avaliadas     : 1375
+  Recall do blocking (teto): 96.8%
+  MRR                     : 0.7650
+  Recall@1                : 67.0%
+  Recall@3                : 84.1%
+  Recall@5                : 88.7%
+  Recall@10               : 92.3%
+  Precisão@1              : 67.0%
+
+  Ablação (mesmo top-K, reordenado por cada camada):
+    camada                                   MRR     R@1     R@3    R@10
+    cosseno E5 (só o bi-encoder)          0.6760   56.4%   75.1%   88.7%
+    fusão E5+TF-IDF (estágio 1)           0.7433   64.4%   81.9%   91.8%
+    + cross-encoder (estágio 2)           0.7433   64.4%   81.9%   91.8%
+    + sinais simbólicos (fase 5b)         0.7649   67.0%   84.1%   92.3%
+    + GraphRAG (fase 6)                   0.7606   66.2%   84.1%   92.3%
+    score final (fase 8)                  0.7650   67.0%   84.1%   92.3%
+
+  Confiança (margem 1o-2o) contra o gabarito:
+    faixa        n       %     P@1     R@3
+    Alta       446   32.4%   96.4%   98.4%
+    Média      295   21.4%   77.3%   90.8%
+    Baixa      634   46.1%   41.5%   71.0%
+
+=== [7] GRAFO UNIFICADO ===

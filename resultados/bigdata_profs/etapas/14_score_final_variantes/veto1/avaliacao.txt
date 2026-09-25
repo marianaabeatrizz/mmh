@@ -1,0 +1,18 @@
+=== [*] AVALIAÇÃO DE RETRIEVAL ===
+  Consultas avaliadas     : 1375
+  Recall do blocking (teto): 96.8%
+  MRR                     : 0.7440
+  Recall@1                : 64.3%
+  Recall@3                : 82.3%
+  Recall@5                : 87.3%
+  Recall@10               : 91.6%
+  Precisão@1              : 64.3%
+
+  Ablação (mesmo top-K, reordenado por cada camada):
+    camada                                   MRR     R@1     R@3    R@10
+    cosseno E5 (só o bi-encoder)          0.6760   56.4%   75.1%   88.7%
+    fusão E5+TF-IDF (estágio 1)           0.7433   64.4%   81.9%   91.8%
+    + cross-encoder (estágio 2)           0.7433   64.4%   81.9%   91.8%
+    + sinais simbólicos (fase 5b)         0.7649   67.0%   84.1%   92.3%
+    + GraphRAG (fase 6)                   0.7645   66.9%   84.0%   92.3%
+    score final (fase 8)                  0.7440   64.3%   82.3%   91.6%
