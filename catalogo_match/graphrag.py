@@ -1,9 +1,9 @@
 """
-graphrag_mmh.py
+graphrag.py
 ===============
 GraphRAG do pipeline MMH em dois papéis:
 
-(A) ADJUDICADOR — fase [6] do pipeline monolítico (`pipeline_completo_mmh.py`).
+(A) ADJUDICADOR — fase [6] do pipeline monolítico (`pipeline.py`).
     Integração com o Microsoft GraphRAG (v3.x).
 
     Fluxo de indexação (roda uma vez, cached em graphrag_workspace/output/):
@@ -16,7 +16,7 @@ GraphRAG do pipeline MMH em dois papéis:
       5. Executa local_search(query=texto_efisco) via graphrag.api
       6. Retorna contexto textual para o LLM de adjudicação
 
-(B) MÓDULO DA GRADE — `pré-proc x proc x pós-proc` (`avaliacao_modular_mmh.py`).
+(B) MÓDULO DA GRADE — `pré-proc x proc x pós-proc` (`avaliacao_modular.py`).
     Em vez de arbitrar pares já pontuados, o mesmo KG serve a dois eixos:
       - pré-processador: enriquece o texto da consulta ANTES da similaridade,
         com entidades vizinhas + rótulo da comunidade — `expandir_consultas()`;
@@ -42,12 +42,28 @@ import pandas as pd
 
 log = logging.getLogger(__name__)
 
-GR_WORKSPACE = Path(__file__).parent / "graphrag_workspace"
-GR_INPUT_DIR  = GR_WORKSPACE / "input"
-GR_OUTPUT_DIR = GR_WORKSPACE / "output"
+from .config import contexto, perfil_ativo
 
-# Arquivo sentinela: criado ao final de uma indexação bem-sucedida
-_SENTINELA_INDEXADO = GR_OUTPUT_DIR / ".indexado_ok"
+# O workspace do Microsoft GraphRAG e POR DATASET. Era um diretorio unico, e um
+# indice de outro corpus reaproveitado em silencio daria resultado errado com
+# cara de certo: o indice e o corpus, nao um cache generico.
+
+
+def ws_graphrag() -> Path:
+    return contexto().dataset.ws_graphrag
+
+
+def gr_input_dir() -> Path:
+    return ws_graphrag() / "input"
+
+
+def gr_output_dir() -> Path:
+    return ws_graphrag() / "output"
+
+
+def sentinela_indexado() -> Path:
+    """Arquivo sentinela: criado ao final de uma indexacao bem-sucedida."""
+    return gr_output_dir() / ".indexado_ok"
 
 
 # ---------------------------------------------------------------------------
@@ -60,14 +76,15 @@ def preparar_corpus(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> int:
     Retorna o número de arquivos gravados.
     Pula se os arquivos já existem (evita reindexar sem motivo).
     """
-    GR_INPUT_DIR.mkdir(parents=True, exist_ok=True)
+    entrada = gr_input_dir()
+    entrada.mkdir(parents=True, exist_ok=True)
     n = 0
 
     for _, row in consultas.iterrows():
         codigo = str(row.get("codigo_efisco", ""))
         texto  = str(row.get("item_efisco", "") or "")
         pdm    = str(row.get("pdm_ancoragem", "") or "")
-        destino = GR_INPUT_DIR / f"efisco_{codigo}.txt"
+        destino = entrada / f"efisco_{codigo}.txt"
         if not destino.exists():
             destino.write_text(
                 f"Item e-Fisco {codigo}\nFamilia PDM: {pdm}\n{texto}",
@@ -79,7 +96,7 @@ def preparar_corpus(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> int:
         codigo = str(row.get("codigo_catmat", ""))
         texto  = str(row.get("item_catmat", "") or "")
         pdm    = str(row.get("pdm", "") or "")
-        destino = GR_INPUT_DIR / f"catmat_{codigo}.txt"
+        destino = entrada / f"catmat_{codigo}.txt"
         if not destino.exists():
             destino.write_text(
                 f"Item CATMAT {codigo}\nFamilia PDM: {pdm}\n{texto}",
@@ -87,7 +104,7 @@ def preparar_corpus(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> int:
             )
         n += 1
 
-    log.info("[GraphRAG] Corpus: %d arquivos em %s", n, GR_INPUT_DIR)
+    log.info("[GraphRAG] Corpus: %d arquivos em %s", n, entrada)
     return n
 
 
@@ -97,7 +114,7 @@ def preparar_corpus(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> int:
 
 def configurar_env(api_key: str) -> None:
     """Grava .env no workspace com GRAPHRAG_API_KEY."""
-    env_path = GR_WORKSPACE / ".env"
+    env_path = ws_graphrag() / ".env"
     env_path.write_text(f"GRAPHRAG_API_KEY={api_key}\n", encoding="utf-8")
     log.info("[GraphRAG] .env configurado em %s", env_path)
 
@@ -108,7 +125,7 @@ def configurar_env(api_key: str) -> None:
 
 def ja_indexado() -> bool:
     """True se o índice já foi gerado com sucesso."""
-    return _SENTINELA_INDEXADO.exists()
+    return sentinela_indexado().exists()
 
 
 def indexar(verbose: bool = True) -> None:
@@ -118,14 +135,14 @@ def indexar(verbose: bool = True) -> None:
     Grava um arquivo sentinela ao concluir.
     """
     log.info("[GraphRAG] Iniciando indexação (pode levar 20-40 min)...")
-    cmd = ["graphrag", "index", "--root", str(GR_WORKSPACE)]
+    cmd = ["graphrag", "index", "--root", str(ws_graphrag())]
     result = subprocess.run(cmd, capture_output=not verbose, text=True)
     if result.returncode != 0:
         stderr = getattr(result, "stderr", "")
         raise RuntimeError(
             f"graphrag index falhou (código {result.returncode}):\n{stderr[:500]}"
         )
-    _SENTINELA_INDEXADO.touch()
+    sentinela_indexado().touch()
     log.info("[GraphRAG] Indexação concluída.")
 
 
@@ -220,7 +237,7 @@ def inicializar(consultas: pd.DataFrame, catalogo: pd.DataFrame,
     else:
         log.info("[GraphRAG] Índice já existente — pulando indexação.")
 
-    config    = load_config(GR_WORKSPACE)
+    config    = load_config(ws_graphrag())
     artefatos = carregar_artefatos(config)
     return config, artefatos
 
@@ -242,18 +259,24 @@ def inicializar(consultas: pd.DataFrame, catalogo: pd.DataFrame,
 #                      OPENAI_API_KEY e o índice já construído (ver seções 1-6).
 # ---------------------------------------------------------------------------
 
-# Tokens sem valor discriminativo para virar entidade
-_SW_ENTIDADE = {
-    "PARA", "COMO", "TIPO", "COM", "SEM", "USO", "CADA", "DEVE",
-    "ESTE", "ESSA", "PRODUTO", "ITEM", "UNIDADE", "CAIXA", "PACOTE",
-    "DEVERA", "CONFORME", "ACORDO", "DADOS", "EMBALAGEM", "EMBALADO",
-    "APRESENTACAO", "MATERIAL", "OUTROS", "DEMAIS",
-}
+# Tokens sem valor discriminativo para virar entidade e teto de itens por
+# entidade: ambos do perfil de dominio (`entidades:` no YAML). Eram literais
+# aqui, e cada um carregava vocabulario de compras hospitalares.
 
-# Entidade presente em mais de N itens do catálogo não discrimina nada
-_MAX_ITENS_POR_ENTIDADE = 200
 
-_CACHE_EXPANSAO_PATH = Path(__file__).parent / "cache_graphrag_expansao.json"
+def _sw_entidade() -> frozenset:
+    return perfil_ativo().entidade_stopwords
+
+
+def _max_itens_por_entidade() -> int:
+    return perfil_ativo().max_itens_por_entidade
+
+
+def _cache_expansao_path() -> Path:
+    """Cache de expansao POR DATASET (o conteudo e o corpus, nao o codigo)."""
+    d = contexto().dataset.dir_cache
+    d.mkdir(parents=True, exist_ok=True)
+    return d / "graphrag_expansao.json"
 
 
 @dataclass
@@ -277,8 +300,9 @@ def _entidades_item(texto: str, atributos: dict | None = None,
     for chave, valor in (atributos or {}).items():
         if valor and chave not in ("tipo_produto", "texto_completo"):
             entidades.add(f"{chave}::{str(valor).upper().strip()[:40]}")
+    sw = _sw_entidade()
     tokens = [t for t in re.findall(r"[A-ZÀ-Ú]{4,}", (texto or "").upper())
-              if t not in _SW_ENTIDADE]
+              if t not in sw]
     for tok in tokens[:10]:
         entidades.add(f"TOK::{tok}")
     return entidades
@@ -299,7 +323,7 @@ def construir_kg(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> GrafoConhec
     compartilham >= 2 entidades), por Louvain — equivalente ao passo de
     detecção de comunidades do GraphRAG.
     """
-    from preprocessamento_mmh import extrair_atributos_catmat
+    from .preprocessamento import extrair_atributos_catmat
 
     G = nx.Graph()
     ents_consulta: dict[int, set[str]] = {}
@@ -356,7 +380,7 @@ def _detectar_comunidades(kg: GrafoConhecimento, n_consultas: int) -> tuple[dict
     G_proj = nx.Graph()
     G_proj.add_nodes_from(range(n_consultas))
     for idxs in ent_para_consultas.values():
-        if len(idxs) > _MAX_ITENS_POR_ENTIDADE:
+        if len(idxs) > _max_itens_por_entidade():
             continue
         for a in range(len(idxs)):
             for b in range(a + 1, len(idxs)):
@@ -407,7 +431,7 @@ def _busca_local(kg: GrafoConhecimento, i: int, top_k: int) -> list[int]:
     contagem: Counter = Counter()
     for ent in relevantes:
         idxs = kg.indice_invertido.get(ent)
-        if not idxs or len(idxs) > _MAX_ITENS_POR_ENTIDADE:
+        if not idxs or len(idxs) > _max_itens_por_entidade():
             continue
         for j in idxs:
             contagem[j] += 1
@@ -436,7 +460,7 @@ def _termos_novos(candidatos: Counter, texto_base: str, max_termos: int) -> list
         if not valor or len(valor) < 3:
             continue
         tokens = [t for t in valor.split()
-                  if t not in _SW_ENTIDADE
+                  if t not in _sw_entidade()
                   and t not in base_tokens
                   and t not in tokens_escolhidos]
         if not tokens:
@@ -449,9 +473,10 @@ def _termos_novos(candidatos: Counter, texto_base: str, max_termos: int) -> list
 
 
 def _carregar_cache_expansao() -> dict:
-    if _CACHE_EXPANSAO_PATH.exists():
+    caminho = _cache_expansao_path()
+    if caminho.exists():
         try:
-            return json.loads(_CACHE_EXPANSAO_PATH.read_text(encoding="utf-8"))
+            return json.loads(caminho.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             log.warning("[GraphRAG/pré] Cache de expansão ilegível — recomeçando.")
     return {}
@@ -459,7 +484,7 @@ def _carregar_cache_expansao() -> dict:
 
 def _salvar_cache_expansao(cache: dict) -> None:
     try:
-        _CACHE_EXPANSAO_PATH.write_text(
+        _cache_expansao_path().write_text(
             json.dumps(cache, ensure_ascii=False, indent=0), encoding="utf-8"
         )
     except OSError as exc:
@@ -494,10 +519,10 @@ def _expandir_via_ms_graphrag(consultas: pd.DataFrame, catalogo: pd.DataFrame,
         if chave in cache:
             termos = cache[chave]
         else:
-            contexto = busca_local(config, artefatos, str(texto_orig)[:300])
+            ctx_local = busca_local(config, artefatos, str(texto_orig)[:300])
             brutos = Counter(
-                f"TOK::{t}" for t in re.findall(r"[A-ZÀ-Ú]{4,}", contexto.upper())
-                if t not in _SW_ENTIDADE
+                f"TOK::{t}" for t in re.findall(r"[A-ZÀ-Ú]{4,}", ctx_local.upper())
+                if t not in _sw_entidade()
             )
             termos = _termos_novos(brutos, texto_base, max_termos)
             cache[chave] = termos

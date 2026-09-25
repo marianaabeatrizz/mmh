@@ -1,6 +1,8 @@
-# Resultados do Pipeline MMH — CATMAT ↔ e-Fisco
+# Resultados do Pipeline — CATMAT ↔ e-Fisco
 
-Pipeline neuro-simbólico para casamento automático de itens de Material Médico Hospitalar (MMH) entre os catálogos CATMAT e e-Fisco/CADMAT do Estado de Pernambuco. Implementa as fases [0]–[9] da Figura 3 do documento técnico.
+Pipeline neuro-simbólico para casamento automático de itens entre os catálogos CATMAT e e-Fisco/CADMAT do Estado de Pernambuco. Implementa as fases [0]–[9] da Figura 3 do documento técnico.
+
+Os números deste documento são do dataset **`mmh`** (Material Médico Hospitalar), que segue sendo o dataset padrão. O pipeline é agnóstico de domínio: o conhecimento de domínio vive em `config/perfis/`, o corpus em `config/datasets/`, e nenhuma fase tem vocabulário hospitalar embutido — ver **[docs/NOVO-DATASET.md](docs/NOVO-DATASET.md)**.
 
 ---
 
@@ -190,7 +192,7 @@ O blocking semântico por embedding foi a melhoria de maior impacto no pipeline:
 ## Grade modular — pré-processador × processador × pós-processador
 
 O pipeline das fases [0]–[9] executa **uma** configuração fixa. A grade modular
-(`avaliacao_modular_mmh.py`) transforma cada etapa em módulo trocável e mede
+(`catalogo_match/avaliacao_modular.py`) transforma cada etapa em módulo trocável e mede
 **todas as combinações** lado a lado, produzindo a matriz e o ranking:
 
 ```
@@ -304,17 +306,21 @@ As 100 combinações completas estão em `resultados/avaliacao_modular.yaml` e
 ### Como executar
 
 ```bash
-python avaliacao_modular_mmh.py                     # grade completa (100 combinações)
-python avaliacao_modular_mmh.py --listar            # lista os módulos disponíveis
-python avaliacao_modular_mmh.py --amostra 200       # subamostra de consultas (rápido)
-python avaliacao_modular_mmh.py --pre nada,graphrag --proc e5 --pos nada,unidades
-python avaliacao_modular_mmh.py --metrica recall_at_3   # troca a métrica das células
-python avaliacao_modular_mmh.py --graphrag-ms       # expansão via índice Microsoft
-python avaliacao_modular_mmh.py --sem-cache         # recalcula os pré-processadores
+python -m catalogo_match.avaliacao_modular               # grade completa (100 combinações)
+python -m catalogo_match.avaliacao_modular --listar      # lista os módulos disponíveis
+python -m catalogo_match.avaliacao_modular --amostra 200 # subamostra de consultas (rápido)
+python -m catalogo_match.avaliacao_modular --pre nada,graphrag --proc e5 --pos nada,unidades
+python -m catalogo_match.avaliacao_modular --metrica recall_at_3  # troca a métrica
+python -m catalogo_match.avaliacao_modular --graphrag-ms # expansão via índice Microsoft
+python -m catalogo_match.avaliacao_modular --sem-cache   # recalcula os pré-processadores
+
+# Outro corpus, ou o mesmo corpus sem nenhum conhecimento curado
+python -m catalogo_match.avaliacao_modular --dataset mmh_opme
+python -m catalogo_match.avaliacao_modular --perfil base
 ```
 
-Tudo que é caro fica em `cache_embeddings/`: textos dos pré-processadores,
-embeddings E5 e scores do cross-encoder. A primeira execução completa leva ~1 h
+Tudo que é caro fica em `cache/<dataset>/embeddings/`: textos dos
+pré-processadores, embeddings E5 e scores do cross-encoder. A primeira execução completa leva ~1 h
 em CPU de 2 núcleos; as seguintes, ~30 s.
 
 **Reprodutibilidade.** Duas fontes de variação foram fechadas: os desempates da
@@ -325,10 +331,12 @@ léxico da fase [1] tem passo estocástico. Com o cache limpo, a linha
 `rede_semantica` da matriz oscila até ~0,01 MRR entre execuções; as demais são
 exatamente reprodutíveis.
 
-A assinatura do cache inclui o fonte de `preprocessamento_mmh.py`,
-`rede_semantica_mmh.py` e `graphrag_mmh.py`: mexer em qualquer um deles
-invalida os textos cacheados por segurança — inclusive edições inócuas, como um
-comentário. É o preço de não usar cache velho depois de uma mudança de lógica.
+A assinatura do cache inclui o fonte de `preprocessamento.py`,
+`rede_semantica.py`, `graphrag.py` e `config.py`, **mais o YAML do perfil em
+uso**: mexer em qualquer um deles invalida os textos cacheados por segurança —
+inclusive edições inócuas, como um comentário. É o preço de não usar cache velho
+depois de uma mudança de lógica, e de não comparar dois domínios com os textos de
+um só.
 
 ### Adicionando um módulo
 
@@ -341,9 +349,279 @@ sem derrubar a grade.
 
 ---
 
+## Multi-dataset: o domínio como dado
+
+Até a refatoração, o conhecimento de domínio estava espalhado por seis módulos:
+as 13 regex de boilerplate jurídico no pré-processamento, as abreviações e a
+tabela de unidades na rede semântica, as 15 famílias com características
+definidoras na ontologia, a lista de famílias do blocking, o esquema de atributos
+nos quatro prompts da LLM. Trocar de dataset exigia editar código em seis lugares
+— e, na prática, significava não trocar.
+
+Agora são duas configurações e nenhuma linha de código:
+
+| Arquivo | Declara | Muda quando |
+|---|---|---|
+| `config/datasets/<nome>.yaml` | arquivos, separador, encoding, saídas | o **corpus** é outro |
+| `config/perfis/<nome>.yaml` | léxico, famílias, unidades, esquema de atributos, papéis dos prompts | o **domínio** é outro |
+
+A separação tem consequência prática: `mmh` e `mmh_opme` são dois corpora do
+mesmo domínio e compartilham o perfil `mmh`. Cada dataset tem saída, cache e
+índice GraphRAG próprios (`resultados/<dataset>/`, `cache/<dataset>/`,
+`graphrag_workspace/<dataset>/`) — um índice de outro corpus reaproveitado em
+silêncio daria resultado errado com cara de certo.
+
+Sem perfil, o pipeline **induz** do corpus o que puder: esquema de atributos,
+famílias, definidoras, hierarquia, stopwords, boilerplate e unidades. O que não
+dá para induzir com honestidade fica de fora e é registrado como lacuna — fator
+de conversão de unidade e cláusula legal esparsa, principalmente. A proveniência
+bloco a bloco (`curado`, `induzido`, `vazio`) sai no bloco `PERFIL` do YAML de
+resultados. Detalhes e limiares em **[docs/NOVO-DATASET.md](docs/NOVO-DATASET.md)**.
+
+### Quanto vale o conhecimento curado
+
+Mesmo corpus (MMH, 150 consultas), perfil `mmh` contra perfil `base` com tudo
+induzido. É a medida direta do que a curadoria humana acrescenta:
+
+| combinação | curado | induzido | Δ |
+|---|---|---|---|
+| `basico` + `fuzzy` + `unidades` | 0,5155 | 0,4312 | **+0,0843** |
+| `basico` + `fuzzy` + `nada` | 0,4643 | 0,3828 | +0,0815 |
+| `basico` + `fuzzy` + `pdm` | 0,4609 | 0,4065 | +0,0544 |
+| `rede_semantica` + `fuzzy` + `unidades` | 0,4874 | 0,4462 | +0,0412 |
+| `basico` + `tfidf` + `pdm` | 0,4158 | 0,4031 | +0,0127 |
+| `basico` + `tfidf` + `nada` | 0,4763 | 0,4678 | +0,0085 |
+| `basico` + `tfidf` + `unidades` | **0,5189** | **0,5144** | +0,0045 |
+| `nada` + `tfidf` + `nada` | 0,3559 | 0,3559 | 0,0000 |
+
+Três leituras:
+
+1. **O casamento léxico é que depende do léxico.** O `fuzzy` perde ~0,08 MRR sem
+   o perfil curado: é ele que faz `QUICKLE` e `QUINCKE` serem a mesma coisa, e
+   `INOX` e `ACO INOXIDAVEL` também. O TF-IDF quase não percebe (+0,0045),
+   porque distribui peso por muitos termos e não depende de um casar exato.
+2. **A indução cobre mais do que parece.** A melhor célula sem nenhum
+   conhecimento humano (0,5144) fica a 0,0045 da melhor com perfil curado
+   (0,5189). Para um domínio novo, começar sem perfil é uma linha de base
+   defensável, não um placeholder.
+3. **As células `nada` são idênticas nos dois perfis**, o que era o esperado: o
+   texto cru não passa pelo perfil. Serve de controle do próprio experimento.
+
+### O MMH não mudou
+
+A refatoração não devia alterar nenhum número publicado aqui, e isso foi
+verificado, não presumido:
+
+| O que | Como | Resultado |
+|---|---|---|
+| Grafo léxico (fase [1]) | hash dos nós e das arestas, indução desligada | idêntico |
+| Normalização e ativação | `normalizar_termo` e `expandir_por_ativacao` em 12 termos | idêntico |
+| Textos pré-processados | hash de 40 registros dos dois lados | idêntico |
+| Extração por regex (fase [2]) | hash da extração sobre 400 textos reais | idêntico |
+| Canonicalização do JSON da LLM | 4 casos, inclusive valor inválido | idêntico |
+| Shapes SHACL (fase [2]) | isomorfismo de grafo RDF (140 triplas) | isomórfico |
+| Famílias do blocking (fase [3]) | lista completa | idêntica |
+| Grade modular | 24 combinações, 150 consultas | 16 idênticas, 8 na linha `rede_semantica` |
+
+As 8 diferenças são todas da linha `rede_semantica`, cujo passo de indução por
+fastText é estocástico — o mesmo código, rodado duas vezes, varia até 0,012 MRR
+nessa amostra, e chega a ~0,02 entre execuções mais distantes. Com a indução
+desligada, o grafo sai byte a byte igual, o que localiza a variação no fastText e
+não na refatoração. Vale como correção ao que este documento dizia antes: a
+oscilação da linha `rede_semantica` é maior que os "~0,01 MRR" registrados na
+seção da grade modular, ao menos em subamostra de 150 consultas.
+
+Duas diferenças deliberadas, registradas para quem comparar execuções antigas:
+
+- **O prompt da fase [2] mudou de formatação.** As chaves `volume_valor` e
+  `volume_unidade` estavam na mesma linha e agora saem em duas, porque o bloco de
+  esquema é gerado a partir do perfil. O conteúdo é o mesmo; o cache de extração é
+  indexado pelo texto do item, não pelo prompt, então nada é invalidado.
+- **`familias` não é a união automática** com as chaves de
+  `atributos_definidores`. Três famílias com definidoras (ESPARADRAPO, FRASCO,
+  BOLSA) nunca estiveram na lista do blocking, e uni-las mudaria o recall do
+  blocking sem que ninguém tivesse pedido. O perfil deixa a escolha visível em
+  vez de herdada.
+
+---
+
+## Separação de características: o que elevou o R@3
+
+O R@3 era o alvo: 65,2% na melhor combinação da grade, com R@10 em 81,8%. A
+distância entre os dois diz onde estava o trabalho — em ~17% das consultas o item
+correto já estava entre os dez primeiros e não chegava aos três.
+
+### Onde o R@3 se perdia
+
+Diagnóstico das 1 012 consultas com `nada + e5`, olhando as 217 (21,4%) cujo
+correto caía entre a 4ª e a 10ª posição:
+
+| achado | % das 217 falhas |
+|---|---|
+| os três intrusos têm **o mesmo PDM exato** do correto | 67,3% |
+| cobertura de atributos **empata** entre correto e intrusos | 43,8% |
+| cobertura de atributos **favorece o intruso** | 30,4% |
+| cobertura de atributos favorece o correto | 25,8% |
+| a consulta contém negação ("sem", "isento de") | 25,3% |
+
+O problema, portanto, não é achar a família: é discriminar **dentro** dela. E o
+sinal de cobertura de atributos — que é o que o pós-processador `graphrag` já
+media — não separa. Um caso típico:
+
+```
+CONSULTA : AGULHA PERIDURAL ... TAMANHO G16 X 3 1/4"
+CORRETO  : ... DIÂMETRO AGULHA: 16 G , COMPRIMENTO: CERCA DE 3" - 80 MM
+TOP-1    : ... DIMENSÃO: 18 G X 1 1/2"        ← cobertura quase igual, calibre errado
+```
+
+O que decide é o **valor numérico por categoria**, e era exatamente o que o
+pipeline não comparava: o pós-processador `unidades` casa o par `(valor, unidade)`
+como texto, então `3 1/2"` nunca encontrava `90 MM`, e `G16` não era reconhecido
+porque a regex exigia o dígito antes do `G`.
+
+### O sinal que funcionou
+
+`catalogo_match/caracteristicas.py` extrai **medida tipada** dos dois lados —
+valor mais unidade, convertidos para a unidade base da categoria — e o
+pós-processador premia o candidato que satisfaz as medidas enunciadas pela
+consulta. Três decisões de implementação, todas vindas de medição:
+
+1. **Conversão antes da comparação.** `3 1/2"` → 88,9 mm encontra `90 MM` dentro
+   da tolerância de 8%, que existe porque o catálogo escreve "CERCA DE". Gauge é
+   lido nas duas ordens (`18G` e `G16`), e a base de comparação é a unidade
+   canônica, não a categoria: 7 FR e 7 G são ambos "calibre" e não são a mesma
+   coisa.
+2. **Ancorado na consulta.** O denominador é o número de categorias que a
+   *consulta* enuncia. Normalizar pelo candidato pune o item mais específico — e
+   o mais específico é o certo.
+3. **Somado, não misturado.** Ver a próxima subseção.
+
+### Resultado
+
+Grade de 24 combinações, 1 012 consultas × 1 054 itens, sem blocking:
+
+| combinação | MRR | R@1 | R@3 | R@10 |
+|---|---|---|---|---|
+| **`basico` + `e5` + `medidas_graphrag`** | **0,6035** | **48,3%** | **67,8%** | 82,9% |
+| `nada` + `e5` + `medidas_graphrag` | 0,5987 | 47,8% | 67,5% | 82,9% |
+| `rede_semantica` + `e5` + `medidas_graphrag` | 0,5855 | 46,3% | 66,7% | 81,4% |
+| `nada` + `e5` + `medidas` | 0,5713 | 44,1% | 65,6% | 82,8% |
+| `nada` + `e5` + `unidades_graphrag` *(melhor anterior)* | 0,5564 | 42,4% | 64,4% | 82,6% |
+| `nada` + `e5` + `nada` | 0,5234 | 39,6% | 60,4% | 81,8% |
+
+Contra a melhor combinação publicada antes (`nada + e5 + unidades_graphrag`, MRR
+0,5622 / R@1 43,9% / R@3 65,2%): **R@3 +2,6 pp, R@1 +4,4 pp, MRR +4,1 pp**.
+O sinal `medidas` **sozinho** já supera a melhor combinação anterior.
+
+Generalização, medida em dois eixos:
+
+| | R@3 antes | R@3 depois | Δ |
+|---|---|---|---|
+| `mmh`, perfil curado | 0,6443 | 0,6749 | +3,1 pp |
+| `mmh`, **perfil `base`** (domínio induzido) | 0,6294 | 0,6601 | +3,1 pp |
+| `mmh_opme` (outro corpus) | 0,7581 | 0,7719 | +1,4 pp |
+
+O ganho não depende da curadoria: com perfil `base`, que só conhece as unidades
+do SI, ele é o mesmo — e fica acima do melhor resultado que o perfil curado
+alcançava sem o sinal.
+
+### Três variantes reprovadas, e o que elas ensinam
+
+O caminho óbvio era comparar **característica categórica** ("cor: branca",
+"tamanho: médio"), inclusive induzindo o léxico valor→chave do próprio catálogo,
+que já vem com `COR: BRANCA`. Foi medido nas mesmas 217 falhas, e todas as
+variantes perderam para o acaso:
+
+| variante | favorece o correto | favorece o intruso |
+|---|---|---|
+| cobertura de todos os atributos do candidato | 25,6% | 28,1% |
+| só as chaves em que os candidatos divergem | 23,1% | 27,3% |
+| idem, com peso por variabilidade na família | 17,4% | 29,8% |
+| cobertura ancorada na consulta, com IDF nos candidatos | 18,4% | 24,9% |
+| **medida tipada** | **21,2%** | **4,1%** |
+
+A razão é sempre a mesma: a distribuição de características é dominada por
+vocabulário de família — `DESCARTAVEL`, `ESTERIL`, `EMBALAGEM INDIVIDUAL` —, que
+todo candidato do bloco satisfaz. Pesar por IDF no conjunto de candidatos não
+resolve, porque os intrusos que chegaram ao top-3 são lexicalmente parecidos com
+a consulta: é por isso que chegaram. O conjunto é adversarial por construção.
+
+Vale a comparação com a leitura já registrada na seção da grade modular, sobre o
+GraphRAG como pré-processador diluir a consulta com vocabulário de família. É o
+mesmo mecanismo, medido agora de outro ângulo.
+
+Misturar o categórico ao sinal de medida **piora o sinal bom**: a razão
+acerto:erro cai de 5,1:1 para 1,4:1. Por isso o módulo entrega só a medida.
+
+**Duas ressalvas honestas.** A primeira: isso foi medido *neste* corpus, onde a
+característica categórica é quase toda boilerplate de família. Num catálogo de
+alimentos, "branco" e "médio" podem ser justamente o que discrimina — a variante
+fica no repositório (`medidas_conflito` e as funções de `caracteristicas.py`) para
+ser remedida em corpus de outro tipo, e não como veredito universal. A segunda: o
+extrator só vê o que o perfil declara. `50 G` de um ovo não é lido no perfil
+`mmh`, porque ali massa não tem `aliases` e a faixa de gauge é 5–34; um domínio de
+alimentos precisa declarar massa.
+
+### A forma de combinar importa tanto quanto o sinal
+
+A primeira implementação penalizava conflito de medida, somando ±peso ao score.
+Ela **piorou** o R@3 (0,601 contra 0,604 sem pós-processamento), apesar de o
+diagnóstico dizer 46 acertos contra 9. O erro estava no diagnóstico, não no
+código: ele olhava só as falhas e nunca media o dano nas 401 consultas que já
+acertavam no top-1, onde penalizar conflito derruba acerto. Premiar acordo
+funciona; punir divergência, neste corpus, não.
+
+A segunda escolha foi a escala. Na mistura convexa dos outros pós-processadores,
+peso 0,25 e peso 0,60 dão **exatamente** o mesmo resultado — sinal de que o bônus
+já domina a similaridade e o ranking virou "ordena por bônus, desempata por E5".
+Somado com peso 0,05, o sinal fica na escala do espalhamento do E5 (~0,1 entre o
+1º e o 10º colocado) e refina em vez de substituir:
+
+| forma | peso | R@3 | MRR |
+|---|---|---|---|
+| convexa | 0,25 e 0,60 (idênticos) | 0,6601 | 0,5747 |
+| aditiva | 0,02 | 0,6700 | 0,5944 |
+| **aditiva** | **0,05** | **0,6729** | 0,5858 |
+| aditiva | 0,20 | 0,6621 | 0,5763 |
+
+Profundidade de reordenação: `top_k` maior eleva o R@10 (0,8399 em 50) e **abaixa**
+o R@3 (0,6275 em 50; 0,6018 em 100), porque um conjunto mais largo dá mais chance
+a item que casa a medida e erra o resto. O padrão de 20 candidatos ficou.
+
+### Uma pista não explorada
+
+A medida também serve de **índice de recuperação**, e não só de reordenação. Nas
+184 consultas cujo correto não entra no top-10, o conjunto dos itens que satisfazem
+*todas* as medidas da consulta contém o correto em 34 casos (18,5%), com mediana de
+**3 itens**. Injetar esses candidatos elevaria o teto em +3,4 pp de R@10 — o que
+exige mexer na recuperação (fase [3]), não no pós-processamento, e não foi feito.
+
+### Como reproduzir
+
+```bash
+python -m catalogo_match.avaliacao_modular \
+    --pre nada,basico --proc e5 \
+    --pos nada,unidades_graphrag,medidas,medidas_graphrag \
+    --metrica recall_at_3
+
+# o que o extrator vê no corpus (e o que falta declarar no perfil)
+python -m catalogo_match.caracteristicas --dataset mmh
+python -m catalogo_match.caracteristicas --texto 'AGULHA G16 X 3 1/4"'
+```
+
+> A tabela de unidades do perfil `mmh` ganhou **POL** (polegada, fator 25,4 para
+> MM), que faltava e é como o catálogo descreve comprimento de agulha. Isso
+> acrescenta um nó `Unidade` ao grafo léxico da fase [1], então a linha
+> `rede_semantica` da matriz muda por causa da tabela, e não por mudança de
+> lógica.
+
+---
+
 ## Arquivos gerados
 
-Todos os entregáveis ficam em `resultados/`:
+Todos os entregáveis ficam em `resultados/<dataset>/` — `resultados/mmh/` para os
+números deste documento. Uma execução `--model <modelo>` isola a saída um nível
+abaixo, em `resultados/<dataset>/<modelo>/`.
 
 | Arquivo                           | Descrição                                                |
 | --------------------------------- | -------------------------------------------------------- |
@@ -351,12 +629,12 @@ Todos os entregáveis ficam em `resultados/`:
 | `stats_pipeline.json`             | Métricas detalhadas por fase + tempos de execução        |
 | `resultado_pipeline.yaml`         | Amostras por faixa de confiança (Alta/Média/Baixa)       |
 | `grafo_unificado.graphml`         | Grafo com itens, PDMs e arestas `:equivalenteA`          |
-| `ontologia_mmh.owl`               | Ontologia OWL gerada pelo pipeline (TBox + ABox parcial) |
+| `ontologia.owl`                   | Ontologia OWL gerada pelo pipeline (TBox + ABox parcial) |
 | `rede_semantica.graphml`          | Grafo léxico de domínio (5 009 nós, 48 996 arestas)      |
 | `rede_semantica_skos.ttl`         | Vista SKOS/RDF do léxico (62 656 triplas)                |
 | `fila_curadoria.csv`              | 200 arestas priorizadas para revisão humana              |
 | `analise_global.png`              | Visualização das comunidades e anomalias                 |
-| `rede_semantica_agulha.png`       | Vizinhança da família AGULHA no grafo léxico             |
+| `rede_semantica_<pdm>.png`        | Vizinhança do PDM em foco (do perfil, ou o mais frequente) |
 | `rede_semantica_geral.png`        | Visão geral da rede semântica (top 80 nós)               |
 | `avaliacao_modular.yaml`          | Grade modular: matriz, ranking das 100 combinações, módulos |
 | `matriz_pre_x_proc.csv`           | Matriz pré-processador × processador (MRR)               |
@@ -369,35 +647,45 @@ Todos os entregáveis ficam em `resultados/`:
 
 ```
 mmh/
-├── pipeline_completo_mmh.py      # orquestrador principal (fases [0]–[9])
-├── avaliacao_modular_mmh.py      # grade pré × proc × pós + ranking de combinações
-├── graphrag_mmh.py               # fase [6] (adjudicação) + pré-proc de expansão
-├── rede_semantica_mmh.py         # fase [1]: grafo léxico + expansão
-├── ontologia_owl_mmh.py          # fase [4]: OWL + reasoner Pellet (SWRL)
-├── preprocessamento_mmh.py       # utilitários de normalização de texto
-├── servico_rede_semantica.py     # serviço HTTP FastAPI (§3.8)
+├── catalogo_match/               # o pacote: algoritmo, sem conhecimento de domínio
+│   ├── config.py                 # DatasetSpec + PerfilDominio + indução do perfil
+│   ├── pipeline.py               # orquestrador principal (fases [0]–[9])
+│   ├── avaliacao_modular.py      # grade pré × proc × pós + ranking de combinações
+│   ├── graphrag.py               # fase [6] (adjudicação) + pré-proc de expansão
+│   ├── rede_semantica.py         # fase [1]: grafo léxico + expansão
+│   ├── ontologia_owl.py          # fase [4]: OWL + reasoner Pellet (SWRL)
+│   ├── preprocessamento.py       # utilitários de normalização de texto
+│   └── servico_rede_semantica.py # serviço HTTP FastAPI (§3.8)
+├── config/                       # o domínio e o corpus, como dado
+│   ├── datasets/mmh.yaml         # arquivos, separador, encoding, saídas
+│   ├── datasets/mmh_opme.yaml    # outro corpus, mesmo perfil
+│   ├── perfis/base.yaml          # neutro: português, SI, formato do rótulo CATMAT
+│   └── perfis/mmh.yaml           # léxico, famílias, unidades, atributos, prompts
 ├── requirements.txt
-├── dados/                        # entradas (ground truth)
+├── dados/mmh/                    # entradas (ground truth), uma pasta por dataset
 │   ├── 20260408_ground_truth_mmh_limpa.csv
 │   ├── 20260408_ground_truth_mmh_test.csv
 │   └── 20260408_ground_truth_mmh_opme_test.csv
-├── resultados/                   # saídas geradas pelo pipeline
+├── resultados/mmh/               # saídas do pipeline, uma pasta por dataset
 │   ├── resultado_pipeline_completo.csv
 │   ├── stats_pipeline.json
 │   ├── resultado_pipeline.yaml
 │   ├── grafo_unificado.graphml
-│   ├── ontologia_mmh.owl
+│   ├── ontologia.owl
 │   ├── rede_semantica.graphml
 │   ├── rede_semantica_skos.ttl
 │   ├── fila_curadoria.csv
 │   ├── analise_global.png
-│   ├── rede_semantica_agulha.png
+│   ├── rede_semantica_agulha_puncao_ossea.png
 │   └── rede_semantica_geral.png
-└── docs/                         # apresentações e documentação
+├── resultados/mmh_opme/          # o mesmo, para o recorte OPME
+├── cache/<dataset>/              # caches de LLM, embeddings e expansão (não versionado)
+└── docs/
+    ├── NOVO-DATASET.md           # como rodar em outro corpus ou domínio
     ├── apresentacao_pipeline.html
-    ├── apresentacao_pre_processamento_mmh.ipynb
-    └── resumo_mudancas_reuniao.yaml
+    └── apresentacao_pre_processamento_mmh.ipynb
 ```
+
 
 ## Como executar
 
@@ -406,11 +694,15 @@ mmh/
 pip install -r requirements.txt
 
 # Execução completa com LLM (requer OPENAI_API_KEY no .env)
-python pipeline_completo_mmh.py
+python -m catalogo_match.pipeline
 
-# Execução offline (regex como fallback, sem custo de API)
-python pipeline_completo_mmh.py --sem-llm
+# Execução offline (regex do perfil como fallback, sem custo de API)
+python -m catalogo_match.pipeline --sem-llm
 
 # Testar conexão com a API antes de rodar
-python pipeline_completo_mmh.py --smoke
+python -m catalogo_match.pipeline --smoke
+
+# Outro corpus, ou o mesmo corpus sem conhecimento curado
+python -m catalogo_match.pipeline --dataset mmh_opme
+python -m catalogo_match.pipeline --perfil base
 ```

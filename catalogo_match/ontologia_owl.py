@@ -1,5 +1,5 @@
 """
-ontologia_owl_mmh.py
+ontologia_owl.py
 ====================
 Ontologia OWL de dominio para o casamento CATMAT <-> e-Fisco, com raciocinio
 DEDUTIVO real (Pellet via owlready2).
@@ -49,8 +49,8 @@ fica como verificacao de consistencia em Python, aplicada DEPOIS da deducao —
 e esta explicitamente marcado como tal na trilha.
 
 Uso:
-    from ontologia_owl_mmh import OntologiaMMH
-    onto = OntologiaMMH(pdms, hierarquia)
+    from catalogo_match.ontologia_owl import OntologiaDominio
+    onto = OntologiaDominio(pdms, hierarquia)
     onto.adicionar_item("efisco", "123", "AGULHA", {"calibre": "22G"})
     onto.adicionar_item("catmat", "456", "AGULHA", {"calibre": "22G"})
     resultado = onto.deduzir()          # roda o Pellet por lotes
@@ -70,8 +70,23 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).parent
-IRI_ONTOLOGIA = "http://mmh.sad.pe.gov.br/ontologia/catmat-efisco.owl"
+from .config import contexto, perfil_ativo, sanitizar as _sanitizar_id
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def iri_ontologia() -> str:
+    """
+    IRI da ontologia do dominio ativo.
+
+    Sem `iri_ontologia` no perfil, monta um IRI local a partir do nome do
+    dataset: emitir OWL sob `mmh.sad.pe.gov.br` para o catalogo de outro orgao
+    seria afirmar uma autoria que nao existe.
+    """
+    perfil = perfil_ativo()
+    if perfil.iri_ontologia:
+        return perfil.iri_ontologia
+    return f"http://localhost/{contexto().dataset.nome}/ontologia/catmat-efisco.owl"
 
 # Heap da JVM usada pelo Pellet. O padrao do owlready2 (2 GB) e apertado para
 # ABox com milhares de individuos; os lotes ja mantem cada passada pequena,
@@ -84,42 +99,30 @@ LOTE_MAX_INDIVIDUOS = 300
 
 # ---------------------------------------------------------------------------
 # Caracteristicas DEFINIDORAS por familia de PDM (sec. 2.2)
-# Sao as que entram na regra SWRL: se todas coincidem, o reasoner deduz
-# equivalencia. Atributos fora desta lista contribuem como evidencia fraca,
-# mas nunca decidem — exatamente a distincao do documento entre "definidora"
-# e "secundaria".
 # ---------------------------------------------------------------------------
+# Sao as que entram na regra SWRL: se todas coincidem, o reasoner deduz
+# equivalencia. Atributos fora desta lista contribuem como evidencia fraca, mas
+# nunca decidem — exatamente a distincao do documento entre "definidora" e
+# "secundaria".
+#
+# A tabela era um literal aqui (AGULHA, SERINGA, CATETER...). Agora vem do perfil
+# de dominio: `atributos_definidores` em config/perfis/<dominio>.yaml, curado ou
+# induzido do corpus (ver config.induzir_perfil). Trocar de dominio deixou de
+# significar editar a ontologia.
 
-CARACTERISTICAS_DEFINIDORAS: dict[str, list[str]] = {
-    "AGULHA":      ["calibre", "comprimento_valor"],
-    "SERINGA":     ["volume_valor"],
-    "CATETER":     ["material", "comprimento_valor"],
-    "SONDA":       ["calibre", "material"],
-    "FIO":         ["material"],
-    "EQUIPO":      ["material"],
-    "LUVA":        ["material"],
-    "TUBO":        ["material", "calibre"],
-    "DRENO":       ["material", "calibre"],
-    "MASCARA":     ["material"],
-    "COMPRESSA":   ["material", "dimensao"],
-    "ATADURA":     ["dimensao"],
-    "ESPARADRAPO": ["dimensao"],
-    "FRASCO":      ["volume_valor"],
-    "BOLSA":       ["volume_valor", "material"],
-}
 
-PROPRIEDADES_PDM = (
-    "calibre", "comprimento_valor", "comprimento_unidade",
-    "volume_valor", "volume_unidade", "dimensao",
-    "conector", "esterilidade", "material", "bisel", "modelo",
-)
+def caracteristicas_definidoras() -> dict[str, list[str]]:
+    return perfil_ativo().atributos_definidores
+
+
+def propriedades_pdm() -> tuple[str, ...]:
+    """Todas as propriedades de dado da TBox: o esquema de atributos do perfil."""
+    return perfil_ativo().chaves_atributos
 
 
 def _sanitizar(nome: str) -> str:
     """Converte um rotulo livre num identificador valido para OWL/Python."""
-    txt = unicodedata.normalize("NFD", str(nome))
-    txt = "".join(c for c in txt if unicodedata.category(c) != "Mn")
-    txt = re.sub(r"[^A-Za-z0-9]+", "_", txt.upper()).strip("_")
+    txt = _sanitizar_id(nome)
     if not txt:
         txt = "SEM_PDM"
     if txt[0].isdigit():
@@ -128,12 +131,8 @@ def _sanitizar(nome: str) -> str:
 
 
 def _familia_de(pdm: str) -> str:
-    """Familia (chave de CARACTERISTICAS_DEFINIDORAS) a que um PDM pertence."""
-    pdm_up = _sanitizar(pdm)
-    for familia in CARACTERISTICAS_DEFINIDORAS:
-        if familia in pdm_up:
-            return familia
-    return ""
+    """Familia (chave de `atributos_definidores`) a que um PDM pertence."""
+    return perfil_ativo().familia_de(pdm)
 
 
 def _normalizar_valor(valor: str) -> str:
@@ -156,7 +155,7 @@ def _normalizar_valor(valor: str) -> str:
     return txt
 
 
-class OntologiaMMH:
+class OntologiaDominio:
     """
     Ontologia OWL do dominio + motor de deducao.
 
@@ -187,7 +186,7 @@ class OntologiaMMH:
         log.info(
             "TBox montada: %d classes PDM | %d propriedades | %d regras SWRL",
             sum(1 for k in self._classes if k.startswith("pdm::")),
-            len(PROPRIEDADES_PDM),
+            len(propriedades_pdm()),
             len(list(self.onto.rules())),
         )
 
@@ -204,7 +203,7 @@ class OntologiaMMH:
             Thing, DataProperty, FunctionalProperty, SymmetricProperty, Imp,
         )
 
-        onto = mundo.get_ontology(IRI_ONTOLOGIA)
+        onto = mundo.get_ontology(iri_ontologia())
         classes: dict[str, type] = {}
 
         with onto:
@@ -226,7 +225,7 @@ class OntologiaMMH:
             class equivalenteA(Item >> Item, SymmetricProperty):
                 """Relacao deduzida pela regra 2.2."""
 
-            for nome in PROPRIEDADES_PDM:
+            for nome in propriedades_pdm():
                 # Funcional: cada item tem no maximo um valor por caracteristica.
                 classes[f"prop::{nome}"] = type(
                     nome, (DataProperty, FunctionalProperty),
@@ -267,7 +266,7 @@ class OntologiaMMH:
             self._classe_pdm(onto, classes, Material, pdm)
 
         # Familias como classes intermediarias: AGULHA_BIOPSIA ⊑ AGULHA ⊑ Material
-        for familia in CARACTERISTICAS_DEFINIDORAS:
+        for familia in caracteristicas_definidoras():
             cls_fam = self._classe_pdm(onto, classes, Material, familia)
             for pdm in self.pdms:
                 nome_pdm = _sanitizar(pdm)
@@ -305,7 +304,7 @@ class OntologiaMMH:
         lida depois, da hierarquia da TBox (ver subsuncao_entre).
         """
         n_regras = 0
-        for familia, definidoras in CARACTERISTICAS_DEFINIDORAS.items():
+        for familia, definidoras in caracteristicas_definidoras().items():
             if not definidoras:
                 continue
             corpo = [
@@ -343,7 +342,7 @@ class OntologiaMMH:
         self._pdm_de_item[chave] = pdm or ""
         self._lado_de_item[chave] = lado
         self._attrs_de_item[chave] = {
-            nome: v for nome in PROPRIEDADES_PDM
+            nome: v for nome in propriedades_pdm()
             if (v := _normalizar_valor(atributos.get(nome, "")))
         }
 
@@ -463,7 +462,7 @@ class OntologiaMMH:
                     continue
 
                 familia = _familia_de(self._pdm_de_item[chave])
-                definidoras = CARACTERISTICAS_DEFINIDORAS.get(familia, [])
+                definidoras = caracteristicas_definidoras().get(familia, [])
                 attrs_e = self._attrs_de_item[chave]
                 resultados[(cod_e, cod_c)] = {
                     "deducao": "equivalenteA",
@@ -532,7 +531,7 @@ class OntologiaMMH:
             return None
 
         familia = _familia_de(self._pdm_de_item.get(ce, ""))
-        definidoras = CARACTERISTICAS_DEFINIDORAS.get(familia, [])
+        definidoras = caracteristicas_definidoras().get(familia, [])
         attrs_e, attrs_c = self._attrs_de_item[ce], self._attrs_de_item[cc]
 
         for attr in definidoras:
@@ -554,7 +553,10 @@ class OntologiaMMH:
 
     def salvar(self, destino: Optional[Path] = None) -> Path:
         """Grava a TBox (classes, propriedades e regras SWRL) em RDF/XML."""
-        destino = destino or (DATA_DIR / "ontologia_mmh.owl")
+        if destino is None:
+            saida = contexto().dataset.dir_resultados
+            saida.mkdir(parents=True, exist_ok=True)
+            destino = saida / "ontologia.owl"
         self.onto.save(file=str(destino), format="rdfxml")
         log.info("Ontologia OWL salva: %s", destino)
         return destino
@@ -562,7 +564,7 @@ class OntologiaMMH:
     def estatisticas(self) -> dict:
         return {
             "n_classes_pdm": sum(1 for k in self._classes if k.startswith("pdm::")),
-            "n_propriedades": len(PROPRIEDADES_PDM),
+            "n_propriedades": len(propriedades_pdm()),
             "n_individuos": len(self._attrs_de_item),
             "n_regras_swrl": len(list(self.onto.rules())),
         }

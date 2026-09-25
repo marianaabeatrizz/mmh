@@ -1,0 +1,16 @@
+# Recorte OPME do MMH (órteses, próteses e materiais especiais).
+#
+# Mesmo domínio do `mmh`, então compartilha o perfil: é para isso que dataset e
+# perfil são coisas separadas. Serve de caso de teste do chaveamento por dataset
+# (corpus diferente, conhecimento igual, resultados em resultados/mmh_opme/).
+
+nome: mmh_opme
+descricao: Recorte OPME do MMH — 464 pares de teste
+perfil: mmh
+
+separador: "|"
+encoding: utf-8-sig
+arquivo_padrao: principal
+
+arquivos:
+  principal: dados/mmh/20260408_ground_truth_mmh_opme_test.csv

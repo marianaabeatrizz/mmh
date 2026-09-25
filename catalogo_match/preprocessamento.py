@@ -1,6 +1,7 @@
 """
-preprocessamento_mmh.py
-Pipeline de pre-processamento para dados MMH com integracao opcional da rede semantica.
+preprocessamento.py
+Pipeline de pre-processamento de texto de catalogo, com integracao opcional da
+rede semantica.
 
 Etapas do pipeline (sem grafo):
     1. Ingestao e validacao dos CSVs
@@ -14,12 +15,17 @@ Etapas do pipeline (sem grafo):
 Etapas adicionais com grafo (sec. 3.7 de rede_semantica_catmat):
     5g. Normalizacao via grafo        -- lookup token->forma canonica (abreviacaoDe/varianteOrtograficaDe)
     5e. Expansao por spreading        -- propaga ativacao para sinonimos/hiperonimos relevantes
-    5p. Ancoragem PDM                 -- liga cada item ao seu PDM/Classe no catalogo CATMAT
+    5p. Ancoragem PDM                 -- liga cada item ao seu PDM/Classe no catalogo
     5v. Documento virtual expandido   -- forma canonica + termos ativados (entrada para embeddings)
 
 Colunas adicionadas ao DataFrame:
     Sem grafo: efisco_processado | catmat_processado | catmat_atributos
     Com grafo: + efisco_normalizado | doc_virtual_expandido | pdm_ancoragem
+
+O que era CONSTANTE de dominio aqui (boilerplate juridico, stopwords, sinonimos)
+agora vem do perfil ativo (`config.perfil_ativo()`), carregado de
+config/perfis/<dominio>.yaml. As funcoes de normalizacao puramente textuais
+-- `normalizar_texto`, `tokenizar` -- nao dependem de dominio e ficaram aqui.
 """
 
 import re
@@ -30,6 +36,8 @@ from typing import Optional, TYPE_CHECKING
 
 import pandas as pd
 
+from .config import COLUNAS_OBRIGATORIAS, contexto, perfil_ativo
+
 if TYPE_CHECKING:
     import networkx as nx
 
@@ -37,94 +45,49 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Configurações e constantes
+# Dominio: nada de constante aqui
 # ---------------------------------------------------------------------------
-
-DATA_DIR = Path(__file__).parent
-DADOS_DIR = DATA_DIR / "dados"
-
-# Arquivos disponíveis na pasta MMH
-ARQUIVOS = {
-    "principal":  DADOS_DIR / "20260408_ground_truth_mmh_limpa.csv",
-    "test":       DADOS_DIR / "20260408_ground_truth_mmh_test.csv",
-    "opme_test":  DADOS_DIR / "20260408_ground_truth_mmh_opme_test.csv",
-    "legado":     DADOS_DIR / "20260405_ground_truth_mmh_limpa.csv",
-}
-
-# Padrões de boilerplate jurídico recorrentes nos textos eFisco
-_BOILERPLATE = [
-    r"O PRODUTO DEVERA(?: ESTAR DE ACORDO COM| OBEDECER A)[^,\.]*",
-    r"COMBINADO COM O? ?ART(?:IGO)?\.? ?\d+[^,\.]*",
-    r"COMB\.? ?C/? ?O? ?ART(?:IGO)?\.? ?\d+[^,\.]*",
-    r"ART(?:IGO)?\.? ?\d+ (?:DA )?L(?:EI)?\.? ?[\d\.]+/\d+[^,\.]*",
-    r"PORT(?:ARIA)?\.? ?CONJ\.? ?N\.? ?\d+[^,\.]*",
-    r"DECRETO[- ]LEI ?\d+/\d+[^,\.]*",
-    r"ROTULAGEM RESPEITANDO[^,\.]*",
-    r"APRESENTACAO CONFORME[^,\.]*",
-    r"CONTENDO DADOS DE (?:IDENTIFICACAO|PROCEDENCIA|VALIDADE)[^,\.]*",
-    r"(?:REG(?:ISTRO)?|REG\.?) (?:NO |N\.? ?)?M\.?S\.?(?:/?ANVISA)?",
-    r"EMBALADO EM COMBINADO COM[^,\.]*",
-    r"A APRESENTACAO DO PRODUTO[^,\.]*",
-    r"PADROES CONFORME LEGISLACAO[^,\.]*",
-]
-_RE_BOILERPLATE = re.compile("|".join(_BOILERPLATE), re.IGNORECASE)
-
-# Stopwords português + domínio (boilerplate residual após limpeza)
-STOPWORDS = {
-    "a", "ao", "aos", "as", "com", "da", "das", "de", "do", "dos",
-    "e", "em", "na", "nas", "no", "nos", "o", "os", "ou", "para",
-    "por", "se", "um", "uma", "uns", "umas",
-    # Resíduos de domínio
-    "produto", "devera", "obedecer", "estar", "acordo", "combinado",
-    "contendo", "dados", "conforme", "apresentacao", "embalado",
-    "embalagem", "individual", "rotulagem", "respeitando",
-}
-
-# Mapa de sinônimos/variantes ortográficas frequentes nos dados eFisco
-SINONIMOS = {
-    # Modelos de agulha
-    r"\bQUICKLE\b":   "QUINCKE",
-    r"\bQUINKER\b":   "QUINCKE",
-    r"\bTOUHY\b":     "TUOHY",
-    # Gauge / calibre
-    r"\b(\d+)\s*GA\b": r"\1G",       # "18GA" -> "18G"
-    r"\bGAUGE\b":     "G",
-    # Conectores
-    r"\bLUER-LOCK\b": "LUER LOCK",
-    r"\bLUER LOCK\b": "LUER LOCK",   # já correto, mas garante espaço
-    # Materiais
-    r"\bACO INOX\b":  "ACO INOXIDAVEL",
-    r"\bINOX\b":      "ACO INOXIDAVEL",
-    # Esterilidade
-    r"\bESTERILIZADO\b": "ESTERIL",
-    # Dimensões – normaliza espaçamento em "18G X 3"
-    r"\bX(?=\s*\d)":  "X",
-}
+# O boilerplate juridico, as stopwords e o mapa de sinonimos eram tres blocos
+# literais neste arquivo. Sairam para config/perfis/<dominio>.yaml: o que o
+# pipeline sabe sobre agulhas deixou de ser codigo.
 
 # ---------------------------------------------------------------------------
 # Carregamento
 # ---------------------------------------------------------------------------
 
 def carregar_dados(
-    arquivo: str = "principal",
+    arquivo: str = "",
     caminho_personalizado: Optional[Path] = None,
 ) -> pd.DataFrame:
-    """Carrega um CSV MMH (separador pipe) e valida as colunas mínimas."""
-    path = caminho_personalizado or ARQUIVOS.get(arquivo)
-    if path is None or not Path(path).exists():
-        raise FileNotFoundError(f"Arquivo não encontrado: {path}")
+    """
+    Carrega um CSV do dataset ativo e valida as colunas minimas.
 
-    df = pd.read_csv(path, sep="|", dtype=str, encoding="utf-8-sig")
-    df.columns = df.columns.str.strip()
+    `arquivo` e a chave logica do dataset ("principal", "test", ...) ou um nome
+    de arquivo; o dataset ativo resolve o caminho, o separador e o encoding.
+    Ao ler, o contexto completa o perfil com o que der para induzir do corpus
+    (so tem efeito quando o perfil nao traz o bloco -- ver config.induzir_perfil).
+    """
+    ctx = contexto()
 
-    colunas_obrigatorias = {"item_efisco", "item_catmat"}
-    faltando = colunas_obrigatorias - set(df.columns)
-    if faltando:
-        raise ValueError(f"Colunas ausentes no CSV: {faltando}")
+    if caminho_personalizado is not None:
+        path = Path(caminho_personalizado)
+        if not path.exists():
+            raise FileNotFoundError(f"Arquivo não encontrado: {path}")
+        df = pd.read_csv(path, sep=ctx.dataset.separador, dtype=str,
+                         encoding=ctx.dataset.encoding)
+        df.columns = df.columns.str.strip()
+        faltando = set(COLUNAS_OBRIGATORIAS) - set(df.columns)
+        if faltando:
+            raise ValueError(f"Colunas ausentes no CSV: {faltando}")
+    else:
+        path = ctx.dataset.caminho(arquivo)
+        df = ctx.dataset.ler(arquivo)
 
     # Preenche NaN com string vazia para não quebrar os pipelines de texto
-    df["item_efisco"] = df["item_efisco"].fillna("")
-    df["item_catmat"] = df["item_catmat"].fillna("")
+    for coluna in COLUNAS_OBRIGATORIAS:
+        df[coluna] = df[coluna].fillna("")
+
+    ctx.completar_com_dados(df)
 
     log.info("Carregado: %s  (%d registros)", path.name, len(df))
     return df
@@ -135,8 +98,16 @@ def carregar_dados(
 # ---------------------------------------------------------------------------
 
 def remover_boilerplate(texto: str) -> str:
-    """Remove cláusulas legais e frases padronizadas do texto eFisco."""
-    texto = _RE_BOILERPLATE.sub(" ", texto)
+    """
+    Remove cláusulas legais e frases padronizadas do texto e-Fisco.
+
+    Os padrões vêm do perfil (`texto.boilerplate`). Perfil sem boilerplate
+    declarado nem induzido devolve o texto intacto — que é o comportamento
+    correto: é melhor deixar ruído do que apagar especificação por engano.
+    """
+    padrao = perfil_ativo().re_boilerplate
+    if padrao is not None:
+        texto = padrao.sub(" ", texto)
     # Remove referências residuais do tipo "L.8078/90"
     texto = re.sub(r"\bL\.?\d+/\d+\b", " ", texto, flags=re.IGNORECASE)
     texto = re.sub(r"\s{2,}", " ", texto)
@@ -225,8 +196,8 @@ def atributos_catmat_para_texto(atributos: dict[str, str]) -> str:
 # ---------------------------------------------------------------------------
 
 def aplicar_sinonimos(texto: str) -> str:
-    """Substitui variantes ortográficas por formas canônicas."""
-    for padrao, substituto in SINONIMOS.items():
+    """Substitui variantes ortograficas por formas canonicas (perfil ativo)."""
+    for padrao, substituto in perfil_ativo().sinonimos_regex.items():
         texto = re.sub(padrao, substituto, texto, flags=re.IGNORECASE)
     return texto
 
@@ -242,7 +213,8 @@ def tokenizar(texto: str) -> list[str]:
 
 
 def remover_stopwords(tokens: list[str]) -> list[str]:
-    return [t for t in tokens if t.lower() not in STOPWORDS]
+    stopwords = perfil_ativo().stopwords
+    return [t for t in tokens if t.lower() not in stopwords]
 
 
 def preprocessar_texto_efisco(texto: str) -> str:
@@ -296,10 +268,12 @@ def preprocessar_dataset(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def salvar_dataset(df: pd.DataFrame, destino: Optional[Path] = None) -> Path:
-    """Salva o dataset processado em CSV (separador pipe)."""
+    """Salva o dataset processado em CSV, na pasta de resultados do dataset."""
+    ds = contexto().dataset
     if destino is None:
-        destino = DATA_DIR / "mmh_preprocessado.csv"
-    df.to_csv(destino, sep="|", index=False, encoding="utf-8-sig")
+        ds.dir_resultados.mkdir(parents=True, exist_ok=True)
+        destino = ds.dir_resultados / f"{ds.nome}_preprocessado.csv"
+    df.to_csv(destino, sep=ds.separador, index=False, encoding=ds.encoding)
     log.info("Dataset salvo em: %s", destino)
     return destino
 
@@ -308,12 +282,25 @@ def salvar_dataset(df: pd.DataFrame, destino: Optional[Path] = None) -> Path:
 # Execução direta
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    df_raw = carregar_dados("principal")
+def _cli() -> None:
+    import argparse
 
+    from .config import ativar, listar_datasets
+
+    ap = argparse.ArgumentParser(
+        description="Pre-processa um dataset e grava o CSV processado.")
+    ap.add_argument("--dataset", default="",
+                    help=f"dataset a processar. Disponiveis: {', '.join(listar_datasets())}")
+    ap.add_argument("--arquivo", default="",
+                    help="chave logica do arquivo no dataset (padrao: o do YAML)")
+    ap.add_argument("--perfil", default="", help="forca outro perfil de dominio")
+    args = ap.parse_args()
+
+    ativar(args.dataset, perfil=args.perfil)
+
+    df_raw = carregar_dados(args.arquivo)
     df_proc = preprocessar_dataset(df_raw)
 
-    # Amostra de verificação
     amostra = df_proc[["item_efisco", "efisco_processado", "catmat_processado"]].head(3)
     print("\n=== Amostra pré-processamento ===")
     for _, row in amostra.iterrows():
@@ -322,3 +309,7 @@ if __name__ == "__main__":
         print(f"CATMAT limpo    : {row['catmat_processado'][:120]}")
 
     salvar_dataset(df_proc)
+
+
+if __name__ == "__main__":
+    _cli()
