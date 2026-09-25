@@ -1,0 +1,390 @@
+# Perfil de domínio: MMH (Material Médico Hospitalar)
+#
+# GERADO a partir das constantes que estavam embutidas nos módulos antes da
+# refatoração multi-dataset (commit 7bb1ff4), para que os números publicados em
+# RESULTADOS.md continuem reproduzíveis: este arquivo é o MMH de sempre, agora
+# como dado e não como código.
+#
+# Tudo aqui é conhecimento CURADO de domínio. O que este arquivo não traz, o
+# pipeline induz do corpus (ver catalogo_match/config.py: induzir_perfil) e
+# registra como induzido na proveniência do run.
+nome: mmh
+descricao: compras públicas hospitalares (Brasil / Material Médico Hospitalar)
+prefixo: mmh
+iri_ontologia: http://mmh.sad.pe.gov.br/ontologia/catmat-efisco.owl
+iri_lexico: http://mmh.sad.pe.gov.br/lexico
+versao_lexico: '2.0'
+llm:
+  especialista: Especialista em materiais medico-hospitalares do Brasil.
+  auditor: Voce e um auditor de compras publicas hospitalares (Brasil/MMH).
+  auditor_curto: um auditor de compras públicas
+texto:
+  boilerplate:
+  - 'O PRODUTO DEVERA(?: ESTAR DE ACORDO COM| OBEDECER A)[^,\.]*'
+  - COMBINADO COM O? ?ART(?:IGO)?\.? ?\d+[^,\.]*
+  - COMB\.? ?C/? ?O? ?ART(?:IGO)?\.? ?\d+[^,\.]*
+  - ART(?:IGO)?\.? ?\d+ (?:DA )?L(?:EI)?\.? ?[\d\.]+/\d+[^,\.]*
+  - PORT(?:ARIA)?\.? ?CONJ\.? ?N\.? ?\d+[^,\.]*
+  - DECRETO[- ]LEI ?\d+/\d+[^,\.]*
+  - ROTULAGEM RESPEITANDO[^,\.]*
+  - APRESENTACAO CONFORME[^,\.]*
+  - CONTENDO DADOS DE (?:IDENTIFICACAO|PROCEDENCIA|VALIDADE)[^,\.]*
+  - (?:REG(?:ISTRO)?|REG\.?) (?:NO |N\.? ?)?M\.?S\.?(?:/?ANVISA)?
+  - EMBALADO EM COMBINADO COM[^,\.]*
+  - A APRESENTACAO DO PRODUTO[^,\.]*
+  - PADROES CONFORME LEGISLACAO[^,\.]*
+  stopwords:
+  - a
+  - acordo
+  - ao
+  - aos
+  - apresentacao
+  - as
+  - com
+  - combinado
+  - conforme
+  - contendo
+  - da
+  - dados
+  - das
+  - de
+  - devera
+  - do
+  - dos
+  - e
+  - em
+  - embalado
+  - embalagem
+  - estar
+  - individual
+  - na
+  - nas
+  - 'no'
+  - nos
+  - o
+  - obedecer
+  - os
+  - ou
+  - para
+  - por
+  - produto
+  - respeitando
+  - rotulagem
+  - se
+  - um
+  - uma
+  - umas
+  - uns
+  sinonimos_regex:
+    \bQUICKLE\b: QUINCKE
+    \bQUINKER\b: QUINCKE
+    \bTOUHY\b: TUOHY
+    \b(\d+)\s*GA\b: \1G
+    \bGAUGE\b: G
+    \bLUER-LOCK\b: LUER LOCK
+    \bLUER LOCK\b: LUER LOCK
+    \bACO INOX\b: ACO INOXIDAVEL
+    \bINOX\b: ACO INOXIDAVEL
+    \bESTERILIZADO\b: ESTERIL
+    \bX(?=\s*\d): X
+lexico:
+  abreviacoes:
+    C/: COM
+    P/: PARA
+    S/: SEM
+    CX: CAIXA
+    PCT: PACOTE
+    FR: FRASCO
+    AMP: AMPOLA
+    ENV: ENVELOPE
+    RL: ROLO
+    PC: PECA
+    PR: PAR
+    KIT: KIT
+    UND: UNIDADE
+    UN: UNIDADE
+    DESC: DESCARTAVEL
+    ESTER: ESTERIL
+    INOX: ACO INOXIDAVEL
+    PVC: CLORETO DE POLIVINILA
+    GA: GAUGE
+    LUER: LUER LOCK
+  variantes:
+    QUICKLE: QUINCKE
+    QUINKER: QUINCKE
+    TOUHY: TUOHY
+    ESTERILIZADOR: ESTERILIZACAO
+    BIOPCIA: BIOPSIA
+    ESPESSURA: ESPESSURA
+    ANASTESIA: ANESTESIA
+  sinonimos:
+    AGULHA PARA PUNCAO: AGULHA PUNCAO
+    BISEL: BISEL CORTANTE
+    CANHAO: CONECTOR
+    TUBO: CANULA
+    SERINGA: DISPOSITIVO INFUSAO
+  hierarquia:
+    AGULHA:
+    - AGULHA PUNCAO OSSEA
+    - AGULHA BIOPSIA
+    - AGULHA ANESTESIA RAQUIDIANA
+    - DISPOSITIVO P ANESTESIA REGIONAL
+    - AGULHA PERIDURAL
+    DISPOSITIVO MEDICO:
+    - AGULHA
+    - FIO DE SUTURA AGULHADO
+    - DISPOSITIVO PORTÁTIL PARA TERAPIA RESPIRATORIA
+    - TUBO HOSPITALAR
+    AGULHA ANESTESIA:
+    - AGULHA ANESTESIA RAQUIDIANA
+    - DISPOSITIVO P ANESTESIA REGIONAL
+  pdm_foco_exemplo: AGULHA PUNCAO OSSEA
+  exemplos_demo:
+  - INOX
+  - QUICKLE
+  - C/
+  - UND
+  - ESTERIL
+# Unidades do dominio. Alem de categoria/base/fator (usados pelo grafo lexico),
+# os campos opcionais abaixo dizem ao extrator de caracteristicas COMO a unidade
+# aparece no texto livre do e-Fisco. Unidade sem `aliases` nao e extraida de
+# texto -- CAIXA e PACOTE ficam de fora de proposito, porque "2 CAIXAS" descreve
+# a compra, nao o item.
+unidades:
+  MM:
+    categoria: comprimento
+    base: MM
+    aliases: [MM, MILIMETRO, MILIMETROS]
+  CM:
+    categoria: comprimento
+    base: MM
+    fator_para_base: 10.0
+    aliases: [CM, CENTIMETRO, CENTIMETROS]
+  M:
+    categoria: comprimento
+    base: MM
+    fator_para_base: 1000.0
+    aliases: [M, METRO, METROS]
+  # Polegada: nao estava na tabela, e o catalogo descreve comprimento de agulha
+  # nela ("CERCA DE 3 1/2\" - 90 MM"). Sem a fracao mista, 3 1/2 lia como 3.
+  POL:
+    categoria: comprimento
+    base: MM
+    fator_para_base: 25.4
+    aliases: ['"', POL, POLEGADA, POLEGADAS]
+    fracao: true
+  ML:
+    categoria: volume
+    base: ML
+    aliases: [ML, MILILITRO, MILILITROS]
+  L:
+    categoria: volume
+    base: ML
+    fator_para_base: 1000.0
+    aliases: [L, LITRO, LITROS]
+  G:
+    categoria: massa
+    base: G
+  KG:
+    categoria: massa
+    base: G
+    fator_para_base: 1000.0
+  MG:
+    categoria: massa
+    base: G
+    fator_para_base: 0.001
+  UNIDADE:
+    categoria: contagem
+    base: UNIDADE
+  DUZIA:
+    categoria: contagem
+    base: UNIDADE
+    fator_para_base: 12.0
+  CENTO:
+    categoria: contagem
+    base: UNIDADE
+    fator_para_base: 100.0
+  # Calibre em gauge. Aparece nas duas ordens no corpus ("18G" e "G18"), e a
+  # faixa evita confundir com a unidade de massa G: gauge medico e inteiro e
+  # esta entre 5 e 34.
+  G_GAUGE:
+    categoria: calibre
+    base: G_GAUGE
+    aliases: [GAUGE, GA, G]
+    prefixo: true
+    faixa: [5, 34]
+    inteiro: true
+  # French / Charriere, o calibre de cateter e sonda. Base propria: 7 FR nao e
+  # 7 G, ainda que as duas sejam "calibre".
+  FR:
+    categoria: calibre
+    base: FR
+    aliases: [FR, CH, CHARRIERE, FRENCH]
+  CAIXA:
+    categoria: embalagem
+    base: CAIXA
+  PACOTE:
+    categoria: embalagem
+    base: PACOTE
+  ROLO:
+    categoria: embalagem
+    base: ROLO
+
+familias:
+- AGULHA
+- SERINGA
+- CATETER
+- SONDA
+- FIO
+- EQUIPO
+- LUVA
+- TUBO
+- DRENO
+- MASCARA
+- COMPRESSA
+- ATADURA
+atributos:
+  calibre:
+    descricao: dígitos+"G" (gauge), ex "15G", "18G"
+    tipo: numero_sufixado
+    sufixo: G
+  comprimento_valor:
+    descricao: número (use "." decimal), ex "5", "3.5"
+    tipo: texto
+  comprimento_unidade:
+    descricao: '"MM" | "CM" | "M"'
+    tipo: unidade
+  volume_valor:
+    descricao: número
+    tipo: texto
+  volume_unidade:
+    descricao: '"ML" | "L"'
+    tipo: unidade
+  dimensao:
+    descricao: ex "5X10CM" (dois eixos)
+    tipo: texto
+  conector:
+    descricao: ex "LUER LOCK", "LUER SLIP"
+    tipo: texto
+  esterilidade:
+    descricao: '"ESTERIL USO UNICO" quando estéril/uso único'
+    tipo: texto
+  material:
+    descricao: MAIÚSCULAS sem acento, ex "ACO INOX", "PVC", "POLIPROPILENO", "LATEX", "SILICONE", "NIQUEL
+      TITANIO"
+    tipo: texto
+  bisel:
+    descricao: ex "BISEL CORTANTE"
+    tipo: texto
+  modelo:
+    descricao: MAIÚSCULAS, ex "QUINCKE", "TUOHY", "WHITACRE"
+    tipo: texto
+atributos_definidores:
+  AGULHA:
+  - calibre
+  - comprimento_valor
+  SERINGA:
+  - volume_valor
+  CATETER:
+  - material
+  - comprimento_valor
+  SONDA:
+  - calibre
+  - material
+  FIO:
+  - material
+  EQUIPO:
+  - material
+  LUVA:
+  - material
+  TUBO:
+  - material
+  - calibre
+  DRENO:
+  - material
+  - calibre
+  MASCARA:
+  - material
+  COMPRESSA:
+  - material
+  - dimensao
+  ATADURA:
+  - dimensao
+  ESPARADRAPO:
+  - dimensao
+  FRASCO:
+  - volume_valor
+  BOLSA:
+  - volume_valor
+  - material
+extracao:
+- atributos:
+    calibre: 1
+  regex: \b(\d[\d,\.]*)\s*G(?:AUGE|A)?\b
+  sufixo: G
+- atributos:
+    comprimento_valor: 1
+    comprimento_unidade: 2
+  regex: \b(\d[\d,\.]*)\s*(CM|MM|M)\b
+  caixa_alta: true
+- atributos:
+    volume_valor: 1
+    volume_unidade: 2
+  regex: \b(\d[\d,\.]*)\s*(ML|L)\b
+  caixa_alta: true
+- atributos:
+    dimensao: 0
+  regex: \b(\d[\d,\.]*)\s*(?:G|GA|GAUGE)?\s*[Xx]\s*(\d[\d,\.]*)\s*(CM|MM)?\b
+  caixa_alta: true
+- atributos:
+    conector: null
+  regex: LUER[\s\-]?LOCK|LUER[\s\-]?SLIP|LUER
+  valor_fixo: LUER LOCK
+- atributos:
+    esterilidade: null
+  regex: ESTERIL(?:IZADO)?|USO[\s\-]?UNICO
+  valor_fixo: ESTERIL USO UNICO
+- atributos:
+    material: 0
+  regex: ACO[\s\-]?INOX(?:IDAVEL)?|PVC|POLIPROPILENO|LATEX|SILICONE|NIQUEL[\s\-]?TITANIO
+  normalizar: true
+- atributos:
+    bisel: null
+  regex: BISEL[\s\-]?CORTANTE|BISEL[\s\-]?FACETADO|BISEL
+  valor_fixo: BISEL CORTANTE
+- atributos:
+    modelo: 0
+  regex: \b(QUINCKE|TUOHY|WHITACRE|CRAWFORD|SPROTTE|CHIBA|VERESS)\b
+  caixa_alta: true
+entidades:
+  stopwords:
+  - ACORDO
+  - APRESENTACAO
+  - CADA
+  - CAIXA
+  - COM
+  - COMO
+  - CONFORME
+  - DADOS
+  - DEMAIS
+  - DEVE
+  - DEVERA
+  - EMBALADO
+  - EMBALAGEM
+  - ESSA
+  - ESTE
+  - ITEM
+  - MATERIAL
+  - OUTROS
+  - PACOTE
+  - PARA
+  - PRODUTO
+  - SEM
+  - TIPO
+  - UNIDADE
+  - USO
+  max_itens_por_entidade: 200
+medidas:
+  regex: (\d+(?:[\.,]\d+)?)\s*(MM|CM|ML|MG|MCG|KG|UI|POL|FR|CH|LITROS?|L|G)\b
+  regex_calibre: \b(\d{1,2})\s*G(?:A|AUGE)?\b
+  rotulo_calibre: G_CALIBRE

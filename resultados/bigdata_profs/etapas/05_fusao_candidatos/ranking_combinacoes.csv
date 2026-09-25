@@ -1,0 +1,16 @@
+﻿posicao,combinacao,pre,proc,pos,n_avaliados,mrr,recall_at_1,recall_at_3,recall_at_5,recall_at_10,precisao_at_1,tempo_total_s
+1,basico + e5_tfidf_lin + medidas_graphrag_idf,basico,e5_tfidf_lin,medidas_graphrag_idf,1375,0.7418,0.6422,0.8196,0.8764,0.9185,0.6422,0.23
+2,basico + e5_tfidf_lin + medidas_graphrag_idf_taxonomia,basico,e5_tfidf_lin,medidas_graphrag_idf_taxonomia,1375,0.732,0.6305,0.8145,0.8713,0.912,0.6305,0.23
+3,basico + e5_tfidf_lin + nada,basico,e5_tfidf_lin,nada,1375,0.73,0.6262,0.8087,0.8655,0.9113,0.6262,0.08
+4,basico + e5_tfidf_kg_cand + medidas_graphrag_idf,basico,e5_tfidf_kg_cand,medidas_graphrag_idf,1375,0.7146,0.6087,0.7978,0.8524,0.9076,0.6087,0.71
+5,basico + e5_tfidf_cand + medidas_graphrag_idf,basico,e5_tfidf_cand,medidas_graphrag_idf,1375,0.7101,0.6051,0.7935,0.848,0.9004,0.6051,0.97
+6,basico + e5_taxonomia + medidas_graphrag_idf,basico,e5_taxonomia,medidas_graphrag_idf,1375,0.7139,0.6175,0.7913,0.8407,0.8836,0.6175,0.23
+7,basico + e5 + medidas_graphrag_idf,basico,e5,medidas_graphrag_idf,1375,0.7044,0.6015,0.7891,0.8415,0.8865,0.6015,4.46
+8,basico + e5_tfidf_kg_cand + medidas_graphrag_idf_taxonomia,basico,e5_tfidf_kg_cand,medidas_graphrag_idf_taxonomia,1375,0.6981,0.5876,0.7891,0.8487,0.9011,0.5876,0.71
+9,basico + e5_tfidf_cand + medidas_graphrag_idf_taxonomia,basico,e5_tfidf_cand,medidas_graphrag_idf_taxonomia,1375,0.6961,0.5876,0.7862,0.8465,0.8967,0.5876,0.98
+10,basico + e5 + medidas_graphrag_idf_taxonomia,basico,e5,medidas_graphrag_idf_taxonomia,1375,0.6898,0.5855,0.7782,0.8356,0.8771,0.5855,2.85
+11,basico + e5_taxonomia + medidas_graphrag_idf_taxonomia,basico,e5_taxonomia,medidas_graphrag_idf_taxonomia,1375,0.6723,0.5629,0.7644,0.8189,0.8662,0.5629,0.21
+12,basico + e5_tfidf_kg_cand + nada,basico,e5_tfidf_kg_cand,nada,1375,0.6861,0.5745,0.7615,0.8291,0.8924,0.5745,0.56
+13,basico + e5_tfidf_cand + nada,basico,e5_tfidf_cand,nada,1375,0.6754,0.5636,0.7498,0.816,0.8815,0.5636,0.84
+14,basico + e5_taxonomia + nada,basico,e5_taxonomia,nada,1375,0.6726,0.5673,0.7476,0.8109,0.8691,0.5673,0.08
+15,basico + e5 + nada,basico,e5,nada,1375,0.6689,0.5622,0.7425,0.8058,0.8691,0.5622,0.12

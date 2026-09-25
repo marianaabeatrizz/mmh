@@ -1,0 +1,25 @@
+# Dataset bigdata_profs — pares e-Fisco <-> CATMAT validados como PERFEITA por
+# duas fontes: mineração em larga escala ("big_data", 1 150 pares) e revisão por
+# profissionais de saúde ("profs_saude", 242 pares). Safra 2026-09-16.
+#
+# Diferente do `mmh`, este corpus é MULTI-DOMÍNIO: ~72% é material médico-
+# hospitalar e medicamentos, mas há mobiliário, papelaria, alimentos, informática,
+# limpeza, construção etc. (ver `grupo_efisco`). O perfil `mmh` é o ponto de
+# partida porque o boilerplate jurídico do e-Fisco e a maior parte do léxico
+# valem aqui via herança (config/perfis/compras_publicas.yaml, `herda: mmh`), e o
+# perfil filho acrescenta massa/dose, concentração, UI, W e V.
+
+nome: bigdata_profs
+descricao: Pares ouro e-Fisco <-> CATMAT (big_data + profissionais de saúde), multi-domínio
+perfil: compras_publicas
+
+separador: "|"
+encoding: utf-8-sig
+arquivo_padrao: principal
+
+arquivos:
+  principal: dados/bigdata_profs/20260916_ground_truth_bigdata_profs_completo_test_ouro.csv
+
+# O CSV já usa o esquema interno (codigo_/item_/classe_ efisco|catmat). Traz
+# ainda grupo_efisco/grupo_catmat, origem e situacao, que os módulos de
+# taxonomia usam quando presentes.

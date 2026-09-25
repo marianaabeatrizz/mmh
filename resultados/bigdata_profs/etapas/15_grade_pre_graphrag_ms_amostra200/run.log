@@ -1,0 +1,388 @@
+INFO | Dataset: bigdata_profs | perfil: compras_publicas
+INFO | Subamostra: 200 consultas (semente 42).
+INFO | Corpus [bigdata_profs]: 200 consultas x 1297 itens de catálogo (200 com gabarito).
+INFO | Grade: 1 pré × 1 proc × 2 pós = 2 combinações.
+INFO | [GraphRAG] Corpus: 1497 arquivos em C:\Users\Educação\mmh\graphrag_workspace\bigdata_profs\input
+INFO | [GraphRAG] .env configurado em C:\Users\Educação\mmh\graphrag_workspace\bigdata_profs\.env
+INFO | [GraphRAG] Índice já existente — pulando indexação.
+INFO | Creating file storage at [C:\Users\Educação\mmh\graphrag_workspace\bigdata_profs\output]
+INFO | reading table from storage: entities.parquet
+INFO | [GraphRAG] Carregado: entities (15584 linhas)
+INFO | reading table from storage: communities.parquet
+INFO | [GraphRAG] Carregado: communities (2578 linhas)
+INFO | reading table from storage: community_reports.parquet
+INFO | [GraphRAG] Carregado: community_reports (2578 linhas)
+INFO | reading table from storage: text_units.parquet
+INFO | [GraphRAG] Carregado: text_units (2678 linhas)
+INFO | reading table from storage: relationships.parquet
+INFO | [GraphRAG] Carregado: relationships (20692 linhas)
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+WARNING | Reached token limit - reverting to previous context state
+INFO | 
+INFO | 
+INFO | [GraphRAG/pré] MS GraphRAG: 200 consultas (200 chamadas novas).
+INFO | No device provided, using cpu
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 200 consultas + 1297 itens (pré=graphrag)...
+INFO |   graphrag       | e5_tfidf_char_lin | nada      -> MRR 0.7246  R@1 0.615  R@3 0.805
+INFO | [pós/medidas] consultas com medida: 155/200 | catálogo: 865/1297 | bases: MM=95, ML=36, PCT=25, G=24, V=17, MG_ML=7
+INFO | [GraphRAG/pré] KG: 9496 nós, 21627 arestas, 7999 entidades, 75 comunidades
+INFO | [taxonomia] histórico: 63 classes e-Fisco x 57 classes CATMAT, 86 pares de classe distintos, 40 de grupo.
+INFO | [taxonomia] correto com compatibilidade > 0 (LOO): 82.5% das consultas; classe sem histórico: 68
+INFO |   graphrag       | e5_tfidf_char_lin | combinado_calibrado -> MRR 0.7471  R@1 0.635  R@3 0.850
+INFO | Metrics for openai/text-embedding-3-small: {
+  "attempted_request_count": 200,
+  "successful_response_count": 200,
+  "failed_response_count": 0,
+  "failure_rate": 0.0,
+  "requests_with_retries": 0,
+  "retries": 0,
+  "retry_rate": 0.0,
+  "compute_duration_seconds": 99.23736023902893,
+  "compute_duration_per_response_seconds": 0.49618680119514463,
+  "cache_hit_rate": 0.0,
+  "streaming_responses": 0,
+  "responses_with_tokens": 200,
+  "prompt_tokens": 17587,
+  "total_tokens": 17587,
+  "tokens_per_response": 87.935,
+  "cost_per_response": 0.0
+}
+INFO | Metrics for openai/gpt-4o-mini: {
+  "attempted_request_count": 200,
+  "successful_response_count": 200,
+  "failed_response_count": 0,
+  "failure_rate": 0.0,
+  "requests_with_retries": 0,
+  "retries": 0,
+  "retry_rate": 0.0,
+  "compute_duration_seconds": 0,
+  "compute_duration_per_response_seconds": 0.0,
+  "cache_hit_rate": 0.0,
+  "streaming_responses": 200,
+  "tokens_per_response": 0.0,
+  "cost_per_response": 0.0
+}
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                  e5_tfidf_char_lin
+graphrag                    0.8050*
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   graphrag + e5_tfidf_char_lin + combinado_calibrado    0.8500   0.635   0.850   0.945  1305.0
+2   graphrag + e5_tfidf_char_lin + nada               0.8050   0.615   0.805   0.935  1302.7
+
+=== ARQUIVOS GERADOS ===
+  C:\Users\Educação\mmh\resultados\bigdata_profs\avaliacao_modular.yaml
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_pre_x_proc.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\ranking_combinacoes.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_modular.png
+
+Tempo total: 1307.3s

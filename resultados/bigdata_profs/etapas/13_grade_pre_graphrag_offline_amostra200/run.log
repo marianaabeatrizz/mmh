@@ -1,0 +1,81 @@
+INFO | Dataset: bigdata_profs | perfil: compras_publicas
+INFO | Subamostra: 200 consultas (semente 42).
+INFO | Corpus [bigdata_profs]: 200 consultas x 1297 itens de catálogo (200 com gabarito).
+INFO | Grade: 4 pré × 2 proc × 2 pós = 16 combinações.
+INFO | No device provided, using cpu
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 200 consultas + 1297 itens (pré=nada)...
+INFO |   nada           | e5        | nada      -> MRR 0.6411  R@1 0.510  R@3 0.715
+INFO | [pós/medidas] consultas com medida: 155/200 | catálogo: 865/1297 | bases: MM=95, ML=36, PCT=25, G=24, V=17, MG_ML=7
+INFO | [GraphRAG/pré] KG: 9496 nós, 21627 arestas, 7999 entidades, 75 comunidades
+INFO | [taxonomia] histórico: 63 classes e-Fisco x 57 classes CATMAT, 86 pares de classe distintos, 40 de grupo.
+INFO | [taxonomia] correto com compatibilidade > 0 (LOO): 82.5% das consultas; classe sem histórico: 68
+INFO |   nada           | e5        | combinado_calibrado -> MRR 0.6895  R@1 0.565  R@3 0.790
+INFO |   nada           | e5_tfidf_char_lin | nada      -> MRR 0.7232  R@1 0.600  R@3 0.810
+INFO |   nada           | e5_tfidf_char_lin | combinado_calibrado -> MRR 0.7431  R@1 0.625  R@3 0.830
+INFO | No device provided, using cpu
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 200 consultas + 1297 itens (pré=basico)...
+INFO |   basico         | e5        | nada      -> MRR 0.6389  R@1 0.525  R@3 0.720
+INFO |   basico         | e5        | combinado_calibrado -> MRR 0.6891  R@1 0.580  R@3 0.770
+INFO |   basico         | e5_tfidf_char_lin | nada      -> MRR 0.7284  R@1 0.620  R@3 0.805
+INFO |   basico         | e5_tfidf_char_lin | combinado_calibrado -> MRR 0.7586  R@1 0.655  R@3 0.845
+INFO | [GraphRAG] Corpus: 1497 arquivos em C:\Users\Educação\mmh\graphrag_workspace\bigdata_profs\input
+INFO | [GraphRAG] .env configurado em C:\Users\Educação\mmh\graphrag_workspace\bigdata_profs\.env
+INFO | [GraphRAG] Índice já existente — pulando indexação.
+WARNING | [GraphRAG/pré] MS GraphRAG indisponível (2 validation errors for GraphRagConfig
+completion_models.default_completion_model
+  Value error, api_key must be set whe) — modo offline.
+INFO | [GraphRAG/pré] Expansão offline: +6.14 termos/consulta (100% expandidas).
+INFO | No device provided, using cpu
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 200 consultas + 1297 itens (pré=graphrag)...
+INFO |   graphrag       | e5        | nada      -> MRR 0.5987  R@1 0.480  R@3 0.650
+INFO |   graphrag       | e5        | combinado_calibrado -> MRR 0.6490  R@1 0.535  R@3 0.735
+INFO |   graphrag       | e5_tfidf_char_lin | nada      -> MRR 0.6513  R@1 0.525  R@3 0.740
+INFO |   graphrag       | e5_tfidf_char_lin | combinado_calibrado -> MRR 0.6912  R@1 0.565  R@3 0.795
+INFO | [GraphRAG] Corpus: 1497 arquivos em C:\Users\Educação\mmh\graphrag_workspace\bigdata_profs\input
+INFO | [GraphRAG] .env configurado em C:\Users\Educação\mmh\graphrag_workspace\bigdata_profs\.env
+INFO | [GraphRAG] Índice já existente — pulando indexação.
+WARNING | [GraphRAG/pré] MS GraphRAG indisponível (2 validation errors for GraphRagConfig
+completion_models.default_completion_model
+  Value error, api_key must be set whe) — modo offline.
+INFO | [GraphRAG/pré] Expansão offline: +3.00 termos/consulta (100% expandidas).
+INFO | No device provided, using cpu
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 200 consultas + 1297 itens (pré=graphrag_leve)...
+INFO |   graphrag_leve  | e5        | nada      -> MRR 0.6052  R@1 0.465  R@3 0.695
+INFO |   graphrag_leve  | e5        | combinado_calibrado -> MRR 0.6568  R@1 0.535  R@3 0.765
+INFO |   graphrag_leve  | e5_tfidf_char_lin | nada      -> MRR 0.6888  R@1 0.570  R@3 0.780
+INFO |   graphrag_leve  | e5_tfidf_char_lin | combinado_calibrado -> MRR 0.7240  R@1 0.615  R@3 0.805
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                                 e5  e5_tfidf_char_lin
+nada                         0.7150            0.8100*
+basico                       0.7200            0.8050*
+graphrag                     0.6500             0.7400
+graphrag_leve                0.6950            0.7800*
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   basico + e5_tfidf_char_lin + combinado_calibrado    0.8450   0.655   0.845   0.935     2.5
+2   nada + e5_tfidf_char_lin + combinado_calibrado    0.8300   0.625   0.830   0.930     3.2
+3   nada + e5_tfidf_char_lin + nada                   0.8100   0.600   0.810   0.930     3.1
+4   basico + e5_tfidf_char_lin + nada                 0.8050   0.620   0.805   0.935     2.5
+5   graphrag_leve + e5_tfidf_char_lin + combinado_calibrado    0.8050   0.615   0.805   0.925     4.0
+6   graphrag + e5_tfidf_char_lin + combinado_calibrado    0.7950   0.565   0.795   0.915     6.1
+7   nada + e5 + combinado_calibrado                   0.7900   0.565   0.790   0.900   441.1
+8   graphrag_leve + e5_tfidf_char_lin + nada          0.7800   0.570   0.780   0.920     4.0
+9   basico + e5 + combinado_calibrado                 0.7700   0.580   0.770   0.870   274.7
+10  graphrag_leve + e5 + combinado_calibrado          0.7650   0.535   0.765   0.875   270.6
+
+=== ARQUIVOS GERADOS ===
+  C:\Users\Educação\mmh\resultados\bigdata_profs\avaliacao_modular.yaml
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_pre_x_proc.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\ranking_combinacoes.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_modular.png
+
+Tempo total: 1299.3s

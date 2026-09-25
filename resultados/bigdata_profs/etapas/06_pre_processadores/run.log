@@ -1,0 +1,133 @@
+INFO | Dataset: bigdata_profs | perfil: compras_publicas
+INFO | Corpus [bigdata_profs]: 1375 consultas x 1297 itens de catálogo (1375 com gabarito).
+INFO | Grade: 3 pré × 2 proc × 2 pós = 12 combinações.
+INFO | [pré/rede] Construindo grafo léxico de domínio (bigdata_profs)...
+INFO | Carregado: 20260916_ground_truth_bigdata_profs_completo_test_ouro.csv  (1392 registros)
+INFO | (a) Construindo verteba estrutural a partir de 1392 registros CATMAT...
+INFO |   -> 724 nos PDM criados
+INFO |   -> 2460 nos Conceito criados
+INFO | (b) Minerando jargao do historico de vinculos...
+INFO |   -> 24 falsas abreviacoes bloqueadas (token e palavra propria)
+INFO |   -> 1603 nos Termo minerados
+INFO | (c) Inserindo semente lexical curada...
+INFO |   -> semente lexical curada inserida (20 abrev., 7 variantes, 5 sinonimos, 11 hierarquias)
+INFO | (d) Induzindo sinonimos por embeddings (fastText)...
+INFO | FastText lifecycle event {'params': 'FastText<vocab=0, vector_size=100, alpha=0.025>', 'datetime': '2026-09-22T23:10:05.940916', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'created'}
+INFO | collecting all words and their counts
+INFO | PROGRESS: at sentence #0, processed 0 words, keeping 0 word types
+INFO | collected 8210 word types from a corpus of 62732 raw words and 2783 sentences
+INFO | Creating a fresh vocabulary
+INFO | FastText lifecycle event {'msg': 'effective_min_count=3 retains 2973 unique words (36.21% of original 8210, drops 5237)', 'datetime': '2026-09-22T23:10:06.089986', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'prepare_vocab'}
+INFO | FastText lifecycle event {'msg': 'effective_min_count=3 leaves 56005 word corpus (89.28% of original 62732, drops 6727)', 'datetime': '2026-09-22T23:10:06.090376', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'prepare_vocab'}
+INFO | deleting the raw counts dictionary of 8210 items
+INFO | sample=0.001 downsamples 51 most-common words
+INFO | FastText lifecycle event {'msg': 'downsampling leaves estimated 49265.60589196917 word corpus (88.0%% of prior 56005)', 'datetime': '2026-09-22T23:10:06.125431', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'prepare_vocab'}
+INFO | estimated required memory for 2973 words, 2000000 buckets and 100 dimensions: 804442912 bytes
+INFO | resetting layer weights
+INFO | FastText lifecycle event {'update': False, 'trim_rule': 'None', 'datetime': '2026-09-22T23:10:08.601710', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'build_vocab'}
+INFO | FastText lifecycle event {'msg': 'training model with 4 workers on 2973 vocabulary and 100 features, using sg=1 hs=0 sample=0.001 negative=5 window=5 shrink_windows=True', 'datetime': '2026-09-22T23:10:08.602100', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'train'}
+INFO | EPOCH 0: training on 62732 raw words (49348 effective words) took 0.4s, 125570 effective words/s
+INFO | EPOCH 1: training on 62732 raw words (49246 effective words) took 0.6s, 82936 effective words/s
+INFO | EPOCH 2: training on 62732 raw words (49231 effective words) took 0.4s, 137029 effective words/s
+INFO | EPOCH 3: training on 62732 raw words (49278 effective words) took 0.5s, 102624 effective words/s
+INFO | EPOCH 4: training on 62732 raw words (49238 effective words) took 0.4s, 110306 effective words/s
+INFO | EPOCH 5: training on 62732 raw words (49283 effective words) took 0.4s, 118830 effective words/s
+INFO | EPOCH 6: training on 62732 raw words (49271 effective words) took 0.4s, 119612 effective words/s
+INFO | EPOCH 7: training on 62732 raw words (49252 effective words) took 0.4s, 120785 effective words/s
+INFO | EPOCH 8: training on 62732 raw words (49281 effective words) took 0.4s, 137810 effective words/s
+INFO | EPOCH 9: training on 62732 raw words (49229 effective words) took 0.5s, 107559 effective words/s
+INFO | EPOCH 10: training on 62732 raw words (49159 effective words) took 0.6s, 87944 effective words/s
+INFO | EPOCH 11: training on 62732 raw words (49335 effective words) took 0.5s, 101575 effective words/s
+INFO | EPOCH 12: training on 62732 raw words (49359 effective words) took 0.4s, 124448 effective words/s
+INFO | EPOCH 13: training on 62732 raw words (49134 effective words) took 0.5s, 96127 effective words/s
+INFO | EPOCH 14: training on 62732 raw words (49193 effective words) took 0.5s, 104659 effective words/s
+INFO | EPOCH 15: training on 62732 raw words (49310 effective words) took 0.4s, 121137 effective words/s
+INFO | EPOCH 16: training on 62732 raw words (49245 effective words) took 0.4s, 124452 effective words/s
+INFO | EPOCH 17: training on 62732 raw words (49230 effective words) took 0.7s, 73127 effective words/s
+INFO | EPOCH 18: training on 62732 raw words (49301 effective words) took 0.4s, 110811 effective words/s
+INFO | EPOCH 19: training on 62732 raw words (49275 effective words) took 0.4s, 119061 effective words/s
+INFO | EPOCH 20: training on 62732 raw words (49280 effective words) took 0.4s, 130396 effective words/s
+INFO | EPOCH 21: training on 62732 raw words (49275 effective words) took 0.4s, 118952 effective words/s
+INFO | EPOCH 22: training on 62732 raw words (49171 effective words) took 0.4s, 112524 effective words/s
+INFO | EPOCH 23: training on 62732 raw words (49206 effective words) took 0.4s, 123070 effective words/s
+INFO | EPOCH 24: training on 62732 raw words (49208 effective words) took 0.4s, 140273 effective words/s
+INFO | EPOCH 25: training on 62732 raw words (49250 effective words) took 0.5s, 95471 effective words/s
+INFO | EPOCH 26: training on 62732 raw words (49253 effective words) took 0.4s, 110357 effective words/s
+INFO | EPOCH 27: training on 62732 raw words (49381 effective words) took 0.4s, 110340 effective words/s
+INFO | EPOCH 28: training on 62732 raw words (49293 effective words) took 0.4s, 119229 effective words/s
+INFO | EPOCH 29: training on 62732 raw words (49330 effective words) took 0.6s, 86617 effective words/s
+INFO | FastText lifecycle event {'msg': 'training on 1881960 raw words (1477845 effective words) took 13.9s, 106330 effective words/s', 'datetime': '2026-09-22T23:10:22.500926', 'gensim': '4.4.0', 'python': '3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:12:50) [MSC v.1942 64 bit (AMD64)]', 'platform': 'Windows-11-10.0.26200-SP0', 'event': 'train'}
+INFO |   -> 2118 candidatos a sinonimo induzidos (800 termos, vocab=2973)
+INFO | (f) Inserindo tabela de unidades...
+INFO |   -> 23 nos Unidade
+INFO | Sem CSV de curadoria em C:\Users\Educação\mmh\dados\bigdata_profs\fila_curadoria_revisada.csv — nada a aplicar.
+INFO | Grafo construido: 7691 nos | 37244 arestas
+INFO | === Resumo do grafo ===
+INFO |   Nos Conceito: 4078
+INFO |   Nos PDM: 724
+INFO |   Nos Termo: 1627
+INFO |   Nos Unidade: 23
+INFO |   Nos ValorDeAtributo: 1239
+INFO |   Arestas abreviacaoDe: 34
+INFO |   Arestas convertePara: 21
+INFO |   Arestas formaCanonicaDe: 27
+INFO |   Arestas hiperonimoDe: 11
+INFO |   Arestas mapeiaParaPDM: 4945
+INFO |   Arestas relacionadoA: 30071
+INFO |   Arestas sinonimoDe: 2128
+INFO |   Arestas varianteOrtograficaDe: 7
+INFO | No device provided, using cpu
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 1375 consultas + 1297 itens (pré=rede_semantica)...
+INFO |   rede_semantica | e5        | nada      -> MRR 0.6389  R@1 0.530  R@3 0.712
+INFO | [pós/medidas] consultas com medida: 1015/1375 | catálogo: 865/1297 | bases: MM=654, ML=181, G=159, PCT=137, V=72, MG_ML=54
+INFO | [GraphRAG/pré] KG: 12380 nós, 32261 arestas, 9708 entidades, 98 comunidades
+INFO |   rede_semantica | e5        | medidas_graphrag_idf -> MRR 0.6862  R@1 0.585  R@3 0.772
+INFO |   rede_semantica | e5_tfidf_lin | nada      -> MRR 0.7147  R@1 0.613  R@3 0.784
+INFO |   rede_semantica | e5_tfidf_lin | medidas_graphrag_idf -> MRR 0.7320  R@1 0.631  R@3 0.809
+INFO | [GraphRAG/pré] Expansão offline: +6.45 termos/consulta (99% expandidas).
+INFO | No device provided, using cpu
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 1375 consultas + 1297 itens (pré=graphrag)...
+INFO |   graphrag       | e5        | nada      -> MRR 0.6214  R@1 0.513  R@3 0.692
+INFO |   graphrag       | e5        | medidas_graphrag_idf -> MRR 0.6628  R@1 0.559  R@3 0.740
+INFO |   graphrag       | e5_tfidf_lin | nada      -> MRR 0.6595  R@1 0.542  R@3 0.743
+INFO |   graphrag       | e5_tfidf_lin | medidas_graphrag_idf -> MRR 0.6856  R@1 0.576  R@3 0.766
+INFO | [GraphRAG/pré] Expansão offline: +2.98 termos/consulta (99% expandidas).
+INFO | No device provided, using cpu
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [proc/e5] Codificando 1375 consultas + 1297 itens (pré=graphrag_leve)...
+INFO |   graphrag_leve  | e5        | nada      -> MRR 0.6412  R@1 0.530  R@3 0.716
+INFO |   graphrag_leve  | e5        | medidas_graphrag_idf -> MRR 0.6848  R@1 0.585  R@3 0.762
+INFO |   graphrag_leve  | e5_tfidf_lin | nada      -> MRR 0.6878  R@1 0.574  R@3 0.773
+INFO |   graphrag_leve  | e5_tfidf_lin | medidas_graphrag_idf -> MRR 0.7050  R@1 0.592  R@3 0.791
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                            e5  e5_tfidf_lin
+rede_semantica          0.7120       0.7840*
+graphrag                0.6916       0.7425*
+graphrag_leve           0.7156       0.7731*
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   rede_semantica + e5_tfidf_lin + medidas_graphrag_idf    0.8087   0.631   0.809   0.910    35.2
+2   graphrag_leve + e5_tfidf_lin + medidas_graphrag_idf    0.7913   0.592   0.791   0.903     3.1
+3   rede_semantica + e5_tfidf_lin + nada              0.7840   0.613   0.784   0.896    35.0
+4   graphrag_leve + e5_tfidf_lin + nada               0.7731   0.574   0.773   0.897     2.9
+5   rede_semantica + e5 + medidas_graphrag_idf        0.7724   0.585   0.772   0.876   522.8
+6   graphrag + e5_tfidf_lin + medidas_graphrag_idf    0.7665   0.576   0.766   0.897     3.3
+7   graphrag_leve + e5 + medidas_graphrag_idf         0.7622   0.585   0.762   0.870   456.5
+8   graphrag + e5_tfidf_lin + nada                    0.7425   0.542   0.743   0.891     3.1
+9   graphrag + e5 + medidas_graphrag_idf              0.7396   0.559   0.740   0.862   495.1
+10  graphrag_leve + e5 + nada                         0.7156   0.530   0.716   0.853   456.2
+
+=== ARQUIVOS GERADOS ===
+  C:\Users\Educação\mmh\resultados\bigdata_profs\avaliacao_modular.yaml
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_pre_x_proc.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\ranking_combinacoes.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_modular.png
+
+Tempo total: 1480.1s

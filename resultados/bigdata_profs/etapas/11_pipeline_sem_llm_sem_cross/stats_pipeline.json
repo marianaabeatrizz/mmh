@@ -1,0 +1,365 @@
+{
+  "fase0": {
+    "n_pares_gabarito": 1392,
+    "n_ok_sem_flags": 157,
+    "n_catalogo": 1297,
+    "n_consultas": 1375,
+    "n_classes_efisco": 163,
+    "n_classes_catmat": 156,
+    "n_pdms_catalogo": 724
+  },
+  "fase1": {
+    "n_nos": 7698,
+    "n_arestas": 37261,
+    "n_com_pdm": 1374,
+    "taxa_oov": 0.25662892360613443
+  },
+  "fase2": {
+    "fonte_extracao": {
+      "llm": 0,
+      "regex": 2672,
+      "erros_llm": 0
+    },
+    "n_completos": 1163,
+    "escore_medio_completude": 0.8770909090909091,
+    "n_consultas_com_atributos": 864,
+    "n_catalogo_com_atributos": 1297
+  },
+  "fase3": {
+    "n_pares_candidatos": 94669,
+    "bloco_medio": 68.85018181818182,
+    "bloco_max": 129,
+    "origem_bloco": {
+      "pdm": 1374,
+      "lexical": 1
+    },
+    "recall_blocking": 0.968
+  },
+  "fase4": {
+    "n_classes_pdm": 744,
+    "n_propriedades": 21,
+    "n_individuos": 2672,
+    "n_regras_swrl": 22,
+    "por_deducao": {
+      "incompleto": 90226,
+      "veto": 4122,
+      "equivalenteA": 291,
+      "broadMatch": 30
+    }
+  },
+  "fase5": {
+    "modelo_embedding": "intfloat/multilingual-e5-base",
+    "encoder_assimetrico": true,
+    "fusao": {
+      "e5": 0.7,
+      "tfidf": 0.15,
+      "tfidf_char": 0.15
+    },
+    "texto_neural": "efisco_processado",
+    "cross_encoder": "desligado",
+    "n_pares_pontuados": 27500,
+    "score_cosine_medio": 0.8623118904807351,
+    "score_fusao_medio": 0.6420122022498738,
+    "score_cross_medio": 0.6420122022498738,
+    "score_neural_medio": 0.6420122022498738
+  },
+  "fase5b": {
+    "ativa": true,
+    "peso": 0.05,
+    "pesos_relativos": {
+      "medidas": 0.6,
+      "graphrag_idf": 1.0,
+      "taxonomia": 0.3
+    },
+    "medidas": {
+      "consultas": {
+        "com_medida": 1015,
+        "total": 1375,
+        "por_base": {
+          "MM": 654,
+          "ML": 181,
+          "G": 159,
+          "PCT": 137,
+          "V": 72,
+          "MG_ML": 54,
+          "G_GAUGE": 49,
+          "FR": 40,
+          "W": 20,
+          "UI": 7
+        }
+      },
+      "catalogo": {
+        "com_medida": 865,
+        "total": 1297,
+        "por_base": {
+          "MM": 559,
+          "G": 139,
+          "ML": 86,
+          "PCT": 82,
+          "FR": 55,
+          "MG_ML": 42,
+          "G_GAUGE": 38,
+          "V": 36,
+          "W": 18,
+          "UI": 7
+        }
+      }
+    },
+    "kg": {
+      "n_nos": 13035,
+      "n_entidades": 7648,
+      "n_comunidades": 51
+    },
+    "taxonomia": {
+      "n_classes_efisco": 162,
+      "n_classes_catmat": 154,
+      "n_pares_classe_distintos": 324,
+      "n_grupos_efisco": 46,
+      "n_pares_grupo_distintos": 148,
+      "consultas_com_classe": 1350,
+      "catalogo_com_classe": 1297,
+      "consultas": 1375,
+      "correto_com_compatibilidade": 1263,
+      "classe_sem_historico_loo": 133,
+      "fracao_correto_compativel": 0.9185,
+      "fonte": "histórico de vínculos, leave-one-out"
+    },
+    "pares_com_sinal": 25203
+  },
+  "fase6": {
+    "graphrag_microsoft": false,
+    "n_arestas_sim": 2644,
+    "n_zona_cinzenta": 818,
+    "criterio_prioridade": "menor margem top1-top2 dentro da zona",
+    "adjudicacao_llm": 0,
+    "adjudicacao_votacao": 310,
+    "adjudicacao_erros": 0
+  },
+  "fase7": {
+    "n_nos": 3396,
+    "n_arestas": 30171,
+    "n_equivalenteA": 1343,
+    "n_candidatoA": 26157
+  },
+  "fase8": {
+    "n_pares": 27500,
+    "n_decisoes": 1375,
+    "score_medio_top1": 0.5935670727272728,
+    "por_confianca": {
+      "Média": 1259,
+      "Alta": 84,
+      "Baixa": 32
+    }
+  },
+  "fase8b": {
+    "n_explicacoes": 0,
+    "motivo_skip": "desligado_por_flag"
+  },
+  "fase9": {
+    "n_comunidades": 176,
+    "tamanhos_comunidades": [
+      55,
+      33,
+      24,
+      12,
+      10,
+      9,
+      9,
+      9,
+      8,
+      6,
+      6,
+      6,
+      6,
+      6,
+      5,
+      5,
+      5,
+      5,
+      5,
+      5
+    ],
+    "n_grupos_duplicatas": 102,
+    "n_anomalias": 481
+  },
+  "avaliacao": {
+    "n_avaliados": 1375,
+    "mrr": 0.7504603230681206,
+    "recall_at_1": 0.6501818181818182,
+    "recall_at_3": 0.8254545454545454,
+    "recall_at_5": 0.8807272727272727,
+    "recall_at_10": 0.9221818181818182,
+    "recall_blocking": 0.968,
+    "precisao_at_1": 0.6501818181818182,
+    "ablacoes": {
+      "cosseno E5 (só o bi-encoder)": {
+        "n_avaliados": 1375,
+        "mrr": 0.6760498421614671,
+        "recall_at_1": 0.5636363636363636,
+        "recall_at_3": 0.7505454545454545,
+        "recall_at_5": 0.8181818181818182,
+        "recall_at_10": 0.8872727272727273
+      },
+      "fusão E5+TF-IDF (estágio 1)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7433258535285283,
+        "recall_at_1": 0.6443636363636364,
+        "recall_at_3": 0.8189090909090909,
+        "recall_at_5": 0.8756363636363637,
+        "recall_at_10": 0.9178181818181819
+      },
+      "+ cross-encoder (estágio 2)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7433258535285283,
+        "recall_at_1": 0.6443636363636364,
+        "recall_at_3": 0.8189090909090909,
+        "recall_at_5": 0.8756363636363637,
+        "recall_at_10": 0.9178181818181819
+      },
+      "+ sinais simbólicos (fase 5b)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7617618461595955,
+        "recall_at_1": 0.6661818181818182,
+        "recall_at_3": 0.8363636363636363,
+        "recall_at_5": 0.8858181818181818,
+        "recall_at_10": 0.9236363636363636
+      },
+      "+ GraphRAG (fase 6)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7582103310080806,
+        "recall_at_1": 0.6610909090909091,
+        "recall_at_3": 0.8334545454545454,
+        "recall_at_5": 0.8858181818181818,
+        "recall_at_10": 0.9236363636363636
+      },
+      "score final (fase 8)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7504603230681206,
+        "recall_at_1": 0.6501818181818182,
+        "recall_at_3": 0.8254545454545454,
+        "recall_at_5": 0.8807272727272727,
+        "recall_at_10": 0.9221818181818182
+      }
+    }
+  },
+  "tempos_execucao": {
+    "fase_0_fontes": {
+      "wall_s": 2.74,
+      "cpu_s": 2.203
+    },
+    "fase_1_rede_semantica": {
+      "wall_s": 82.41,
+      "cpu_s": 84.156
+    },
+    "fase_2_extracao": {
+      "wall_s": 1.006,
+      "cpu_s": 0.781
+    },
+    "fase_3_blocking": {
+      "wall_s": 8.699,
+      "cpu_s": 7.219
+    },
+    "reasoner_pellet": {
+      "wall_s": 42.073,
+      "cpu_s": 5.844
+    },
+    "fase_4_ontologia": {
+      "wall_s": 50.382,
+      "cpu_s": 13.203
+    },
+    "fase_5_matcher_neural": {
+      "wall_s": 0.767,
+      "cpu_s": 0.703
+    },
+    "fase_5b_sinais_simbolicos": {
+      "wall_s": 6.377,
+      "cpu_s": 5.297
+    },
+    "fase_6_graphrag": {
+      "wall_s": 8.133,
+      "cpu_s": 6.734
+    },
+    "fase_8_confianca": {
+      "wall_s": 1.545,
+      "cpu_s": 1.312
+    },
+    "avaliacao_retrieval": {
+      "wall_s": 4.475,
+      "cpu_s": 3.703
+    },
+    "fase_7_grafo_unificado": {
+      "wall_s": 6.367,
+      "cpu_s": 5.484
+    },
+    "fase_8b_explicabilidade": {
+      "wall_s": 0.0,
+      "cpu_s": 0.0
+    },
+    "fase_9_analise_global": {
+      "wall_s": 1.458,
+      "cpu_s": 1.219
+    }
+  },
+  "config": {
+    "modelo_embedding": "intfloat/multilingual-e5-base",
+    "modelo_cross_encoder": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "modelo_llm": "gpt-4o-mini",
+    "k_rerank": 20,
+    "pesos_score_final": {
+      "ontologia": 0.35,
+      "neural": 0.45,
+      "graphrag": 0.2
+    },
+    "pesos_fusao": {
+      "e5": 0.7,
+      "tfidf": 0.15,
+      "tfidf_char": 0.15
+    },
+    "texto_neural": "basico",
+    "peso_sinais": 0.05,
+    "pesos_rel_sinais": {
+      "medidas": 0.6,
+      "graphrag_idf": 1.0,
+      "taxonomia": 0.3
+    },
+    "usar_llm": false,
+    "usar_rede_semantica": true,
+    "usar_cross_encoder": false,
+    "usar_sinais": true,
+    "llm_max_adjudicacoes": 500
+  },
+  "perfil": {
+    "NOME": "compras_publicas",
+    "DESCRICAO": "compras públicas (Brasil) — material hospitalar, medicamentos e bens de uso geral",
+    "TAMANHOS": {
+      "boilerplate": 13,
+      "stopwords": 41,
+      "abreviacoes": 20,
+      "variantes": 7,
+      "sinonimos": 5,
+      "hierarquia": 11,
+      "unidades": 23,
+      "familias": 27,
+      "atributos": 21,
+      "atributos_definidores": 22,
+      "regras_extracao": 9
+    },
+    "PROVENIENCIA": {
+      "boilerplate": "curado",
+      "stopwords": "curado",
+      "sinonimos_regex": "curado",
+      "abreviacoes": "curado",
+      "variantes": "curado",
+      "sinonimos": "curado",
+      "hierarquia": "curado",
+      "unidades": "curado",
+      "atributos": "curado",
+      "atributos_definidores": "curado",
+      "extracao": "curado",
+      "entidade_stopwords": "curado",
+      "familias_extra": "curado",
+      "medidas": "curado"
+    },
+    "LACUNAS": []
+  }
+}

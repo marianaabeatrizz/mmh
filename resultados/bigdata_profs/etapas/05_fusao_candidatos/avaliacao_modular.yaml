@@ -1,0 +1,383 @@
+INFO:
+  DATA: '2026-09-22 23:09:13'
+  ARQUITETURA: pré-proc x processador x pós-proc (pipeline.jpg)
+  METRICA_MATRIZ: recall_at_3
+  TOP_K_CANDIDATOS: 20
+  DADOS:
+    DATASET: bigdata_profs
+    GROUND_TRUTH: 20260916_ground_truth_bigdata_profs_completo_test_ouro.csv
+    N_CONSULTAS: 1375
+    N_CATALOGO: 1297
+    BLOCKING: nenhum — catálogo inteiro por consulta
+  PERFIL:
+    NOME: compras_publicas
+    DESCRICAO: compras públicas (Brasil) — material hospitalar, medicamentos e bens de uso geral
+    TAMANHOS:
+      boilerplate: 13
+      stopwords: 41
+      abreviacoes: 20
+      variantes: 7
+      sinonimos: 5
+      hierarquia: 11
+      unidades: 23
+      familias: 24
+      atributos: 11
+      atributos_definidores: 15
+      regras_extracao: 9
+    PROVENIENCIA:
+      boilerplate: curado
+      stopwords: curado
+      sinonimos_regex: curado
+      abreviacoes: curado
+      variantes: curado
+      sinonimos: curado
+      hierarquia: curado
+      unidades: curado
+      atributos: curado
+      atributos_definidores: curado
+      extracao: curado
+      entidade_stopwords: curado
+      familias_extra: curado
+      medidas: curado
+    LACUNAS: []
+  MODULOS:
+    PRE:
+    - ID: basico
+      NOME: Normalização básica
+      DESCRICAO: boilerplate jurídico + sinônimos + stopwords
+    PROC:
+    - ID: e5
+      NOME: E5 bi-encoder
+      DESCRICAO: intfloat/multilingual-e5-base
+    - ID: e5_tfidf_cand
+      NOME: candidatos de E5+TF-IDF (RRF), score E5
+      DESCRICAO: a fusão alarga o top-K; o E5 ordena e os pós recebem cosseno
+    - ID: e5_tfidf_kg_cand
+      NOME: candidatos de E5+TF-IDF+KG (RRF), score E5
+      DESCRICAO: idem, com a busca local do KG como terceira fonte
+    - ID: e5_tfidf_lin
+      NOME: E5 + TF-IDF (linear 0,8/0,2)
+      DESCRICAO: 'soma ponderada de cossenos: mesma escala do E5'
+    - ID: e5_taxonomia
+      NOME: E5 guiado pela taxonomia
+      DESCRICAO: cosseno E5 + 0,02 x compatibilidade de classe (LOO) sobre o catálogo inteiro, antes do
+        corte
+    POS:
+    - ID: nada
+      NOME: Pós-proc 1 (Nada)
+      DESCRICAO: ranking do processador, sem reordenação
+    - ID: medidas_graphrag_idf
+      NOME: Medida tipada + GraphRAG IDF
+      DESCRICAO: medida convertida + cobertura IDF (aditivo)
+    - ID: medidas_graphrag_idf_taxonomia
+      NOME: Medida + GraphRAG IDF + taxonomia
+      DESCRICAO: idem, com a cobertura ponderada por IDF
+META_PRE:
+  basico:
+    transformacao: boilerplate + sinônimos + stopwords
+META_SINAIS:
+  MEDIDAS:
+    consultas:
+      com_medida: 1015
+      total: 1375
+      por_base:
+        MM: 654
+        ML: 181
+        G: 159
+        PCT: 137
+        V: 72
+        MG_ML: 54
+        G_GAUGE: 49
+        FR: 40
+        W: 20
+        UI: 7
+    catalogo:
+      com_medida: 865
+      total: 1297
+      por_base:
+        MM: 559
+        G: 139
+        ML: 86
+        PCT: 82
+        FR: 55
+        MG_ML: 42
+        G_GAUGE: 38
+        V: 36
+        W: 18
+        UI: 7
+  TAXONOMIA:
+    n_classes_efisco: 162
+    n_classes_catmat: 154
+    n_pares_classe_distintos: 324
+    n_grupos_efisco: 46
+    n_pares_grupo_distintos: 148
+    consultas_com_classe: 1350
+    catalogo_com_classe: 1297
+    consultas: 1375
+    correto_com_compatibilidade: 1263
+    classe_sem_historico_loo: 133
+    fracao_correto_compativel: 0.9185
+MATRIZ:
+  basico:
+    e5: 0.7425
+    e5_tfidf_cand: 0.7498
+    e5_tfidf_kg_cand: 0.7615
+    e5_tfidf_lin: 0.8087
+    e5_taxonomia: 0.7476
+RANKING:
+- POSICAO: 1
+  COMBINACAO: basico + e5_tfidf_lin + medidas_graphrag_idf
+  PRE: basico
+  PROC: e5_tfidf_lin
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.7418
+    recall_at_1: 0.6422
+    recall_at_3: 0.8196
+    recall_at_5: 0.8764
+    recall_at_10: 0.9185
+    precisao_at_1: 0.6422
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.15
+- POSICAO: 2
+  COMBINACAO: basico + e5_tfidf_lin + medidas_graphrag_idf_taxonomia
+  PRE: basico
+  PROC: e5_tfidf_lin
+  POS: medidas_graphrag_idf_taxonomia
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.732
+    recall_at_1: 0.6305
+    recall_at_3: 0.8145
+    recall_at_5: 0.8713
+    recall_at_10: 0.912
+    precisao_at_1: 0.6305
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.15
+- POSICAO: 3
+  COMBINACAO: basico + e5_tfidf_lin + nada
+  PRE: basico
+  PROC: e5_tfidf_lin
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.73
+    recall_at_1: 0.6262
+    recall_at_3: 0.8087
+    recall_at_5: 0.8655
+    recall_at_10: 0.9113
+    precisao_at_1: 0.6262
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.0
+- POSICAO: 4
+  COMBINACAO: basico + e5_tfidf_kg_cand + medidas_graphrag_idf
+  PRE: basico
+  PROC: e5_tfidf_kg_cand
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.7146
+    recall_at_1: 0.6087
+    recall_at_3: 0.7978
+    recall_at_5: 0.8524
+    recall_at_10: 0.9076
+    precisao_at_1: 0.6087
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.55
+    pos: 0.15
+- POSICAO: 5
+  COMBINACAO: basico + e5_tfidf_cand + medidas_graphrag_idf
+  PRE: basico
+  PROC: e5_tfidf_cand
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.7101
+    recall_at_1: 0.6051
+    recall_at_3: 0.7935
+    recall_at_5: 0.848
+    recall_at_10: 0.9004
+    precisao_at_1: 0.6051
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.83
+    pos: 0.13
+- POSICAO: 6
+  COMBINACAO: basico + e5_taxonomia + medidas_graphrag_idf
+  PRE: basico
+  PROC: e5_taxonomia
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.7139
+    recall_at_1: 0.6175
+    recall_at_3: 0.7913
+    recall_at_5: 0.8407
+    recall_at_10: 0.8836
+    precisao_at_1: 0.6175
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.15
+- POSICAO: 7
+  COMBINACAO: basico + e5 + medidas_graphrag_idf
+  PRE: basico
+  PROC: e5
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.7044
+    recall_at_1: 0.6015
+    recall_at_3: 0.7891
+    recall_at_5: 0.8415
+    recall_at_10: 0.8865
+    precisao_at_1: 0.6015
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.11
+    pos: 4.34
+- POSICAO: 8
+  COMBINACAO: basico + e5_tfidf_kg_cand + medidas_graphrag_idf_taxonomia
+  PRE: basico
+  PROC: e5_tfidf_kg_cand
+  POS: medidas_graphrag_idf_taxonomia
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6981
+    recall_at_1: 0.5876
+    recall_at_3: 0.7891
+    recall_at_5: 0.8487
+    recall_at_10: 0.9011
+    precisao_at_1: 0.5876
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.55
+    pos: 0.15
+- POSICAO: 9
+  COMBINACAO: basico + e5_tfidf_cand + medidas_graphrag_idf_taxonomia
+  PRE: basico
+  PROC: e5_tfidf_cand
+  POS: medidas_graphrag_idf_taxonomia
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6961
+    recall_at_1: 0.5876
+    recall_at_3: 0.7862
+    recall_at_5: 0.8465
+    recall_at_10: 0.8967
+    precisao_at_1: 0.5876
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.83
+    pos: 0.14
+- POSICAO: 10
+  COMBINACAO: basico + e5 + medidas_graphrag_idf_taxonomia
+  PRE: basico
+  PROC: e5
+  POS: medidas_graphrag_idf_taxonomia
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6898
+    recall_at_1: 0.5855
+    recall_at_3: 0.7782
+    recall_at_5: 0.8356
+    recall_at_10: 0.8771
+    precisao_at_1: 0.5855
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.11
+    pos: 2.73
+- POSICAO: 11
+  COMBINACAO: basico + e5_taxonomia + medidas_graphrag_idf_taxonomia
+  PRE: basico
+  PROC: e5_taxonomia
+  POS: medidas_graphrag_idf_taxonomia
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6723
+    recall_at_1: 0.5629
+    recall_at_3: 0.7644
+    recall_at_5: 0.8189
+    recall_at_10: 0.8662
+    precisao_at_1: 0.5629
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.13
+- POSICAO: 12
+  COMBINACAO: basico + e5_tfidf_kg_cand + nada
+  PRE: basico
+  PROC: e5_tfidf_kg_cand
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6861
+    recall_at_1: 0.5745
+    recall_at_3: 0.7615
+    recall_at_5: 0.8291
+    recall_at_10: 0.8924
+    precisao_at_1: 0.5745
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.55
+    pos: 0.0
+- POSICAO: 13
+  COMBINACAO: basico + e5_tfidf_cand + nada
+  PRE: basico
+  PROC: e5_tfidf_cand
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6754
+    recall_at_1: 0.5636
+    recall_at_3: 0.7498
+    recall_at_5: 0.816
+    recall_at_10: 0.8815
+    precisao_at_1: 0.5636
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.83
+    pos: 0.0
+- POSICAO: 14
+  COMBINACAO: basico + e5_taxonomia + nada
+  PRE: basico
+  PROC: e5_taxonomia
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6726
+    recall_at_1: 0.5673
+    recall_at_3: 0.7476
+    recall_at_5: 0.8109
+    recall_at_10: 0.8691
+    precisao_at_1: 0.5673
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.07
+    pos: 0.0
+- POSICAO: 15
+  COMBINACAO: basico + e5 + nada
+  PRE: basico
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6689
+    recall_at_1: 0.5622
+    recall_at_3: 0.7425
+    recall_at_5: 0.8058
+    recall_at_10: 0.8691
+    precisao_at_1: 0.5622
+  TEMPO_S:
+    pre: 0.01
+    proc: 0.11
+    pos: 0.0
+SEM_VALOR: []

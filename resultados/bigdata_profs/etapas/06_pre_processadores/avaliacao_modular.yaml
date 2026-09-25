@@ -1,0 +1,341 @@
+INFO:
+  DATA: '2026-09-22 23:34:34'
+  ARQUITETURA: pré-proc x processador x pós-proc (pipeline.jpg)
+  METRICA_MATRIZ: recall_at_3
+  TOP_K_CANDIDATOS: 20
+  DADOS:
+    DATASET: bigdata_profs
+    GROUND_TRUTH: 20260916_ground_truth_bigdata_profs_completo_test_ouro.csv
+    N_CONSULTAS: 1375
+    N_CATALOGO: 1297
+    BLOCKING: nenhum — catálogo inteiro por consulta
+  PERFIL:
+    NOME: compras_publicas
+    DESCRICAO: compras públicas (Brasil) — material hospitalar, medicamentos e bens de uso geral
+    TAMANHOS:
+      boilerplate: 13
+      stopwords: 41
+      abreviacoes: 20
+      variantes: 7
+      sinonimos: 5
+      hierarquia: 11
+      unidades: 23
+      familias: 24
+      atributos: 11
+      atributos_definidores: 15
+      regras_extracao: 9
+    PROVENIENCIA:
+      boilerplate: curado
+      stopwords: curado
+      sinonimos_regex: curado
+      abreviacoes: curado
+      variantes: curado
+      sinonimos: curado
+      hierarquia: curado
+      unidades: curado
+      atributos: curado
+      atributos_definidores: curado
+      extracao: curado
+      entidade_stopwords: curado
+      familias_extra: curado
+      medidas: curado
+    LACUNAS: []
+  MODULOS:
+    PRE:
+    - ID: rede_semantica
+      NOME: Rede semântica
+      DESCRICAO: 'grafo léxico: normalização + propagação de ativação'
+    - ID: graphrag
+      NOME: GraphRAG (expansão por grafo)
+      DESCRICAO: 6 entidades vizinhas no KG + rótulo da comunidade
+    - ID: graphrag_leve
+      NOME: GraphRAG conservador
+      DESCRICAO: 3 entidades vizinhas, sem rótulo de comunidade
+    PROC:
+    - ID: e5
+      NOME: E5 bi-encoder
+      DESCRICAO: intfloat/multilingual-e5-base
+    - ID: e5_tfidf_lin
+      NOME: E5 + TF-IDF (linear 0,8/0,2)
+      DESCRICAO: 'soma ponderada de cossenos: mesma escala do E5'
+    POS:
+    - ID: nada
+      NOME: Pós-proc 1 (Nada)
+      DESCRICAO: ranking do processador, sem reordenação
+    - ID: medidas_graphrag_idf
+      NOME: Medida tipada + GraphRAG IDF
+      DESCRICAO: medida convertida + cobertura IDF (aditivo)
+META_PRE:
+  rede_semantica:
+    transformacao: 'grafo léxico: normalização + ativação'
+    n_nos: 7691
+    n_arestas: 37244
+  graphrag:
+    transformacao: básico + expansão GraphRAG
+    modo: offline
+    n_consultas: 1375
+    n_nos_kg: 12380
+    n_arestas_kg: 32261
+    n_entidades: 9708
+    n_comunidades: 98
+    n_com_rotulo_comunidade: 668
+    media_termos_adicionados: 6.45
+    taxa_expandidas: 0.9935
+  graphrag_leve:
+    transformacao: básico + expansão GraphRAG
+    modo: offline
+    n_consultas: 1375
+    n_nos_kg: 12380
+    n_arestas_kg: 32261
+    n_entidades: 9708
+    n_comunidades: 98
+    n_com_rotulo_comunidade: 0
+    media_termos_adicionados: 2.98
+    taxa_expandidas: 0.9935
+META_SINAIS:
+  MEDIDAS:
+    consultas:
+      com_medida: 1015
+      total: 1375
+      por_base:
+        MM: 654
+        ML: 181
+        G: 159
+        PCT: 137
+        V: 72
+        MG_ML: 54
+        G_GAUGE: 49
+        FR: 40
+        W: 20
+        UI: 7
+    catalogo:
+      com_medida: 865
+      total: 1297
+      por_base:
+        MM: 559
+        G: 139
+        ML: 86
+        PCT: 82
+        FR: 55
+        MG_ML: 42
+        G_GAUGE: 38
+        V: 36
+        W: 18
+        UI: 7
+  TAXONOMIA: null
+MATRIZ:
+  rede_semantica:
+    e5: 0.712
+    e5_tfidf_lin: 0.784
+  graphrag:
+    e5: 0.6916
+    e5_tfidf_lin: 0.7425
+  graphrag_leve:
+    e5: 0.7156
+    e5_tfidf_lin: 0.7731
+RANKING:
+- POSICAO: 1
+  COMBINACAO: rede_semantica + e5_tfidf_lin + medidas_graphrag_idf
+  PRE: rede_semantica
+  PROC: e5_tfidf_lin
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.732
+    recall_at_1: 0.6313
+    recall_at_3: 0.8087
+    recall_at_5: 0.8647
+    recall_at_10: 0.9105
+    precisao_at_1: 0.6313
+  TEMPO_S:
+    pre: 34.02
+    proc: 0.98
+    pos: 0.19
+- POSICAO: 2
+  COMBINACAO: graphrag_leve + e5_tfidf_lin + medidas_graphrag_idf
+  PRE: graphrag_leve
+  PROC: e5_tfidf_lin
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.705
+    recall_at_1: 0.592
+    recall_at_3: 0.7913
+    recall_at_5: 0.8618
+    recall_at_10: 0.9033
+    precisao_at_1: 0.592
+  TEMPO_S:
+    pre: 1.75
+    proc: 1.12
+    pos: 0.19
+- POSICAO: 3
+  COMBINACAO: rede_semantica + e5_tfidf_lin + nada
+  PRE: rede_semantica
+  PROC: e5_tfidf_lin
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.7147
+    recall_at_1: 0.6131
+    recall_at_3: 0.784
+    recall_at_5: 0.8422
+    recall_at_10: 0.896
+    precisao_at_1: 0.6131
+  TEMPO_S:
+    pre: 34.02
+    proc: 0.98
+    pos: 0.0
+- POSICAO: 4
+  COMBINACAO: graphrag_leve + e5_tfidf_lin + nada
+  PRE: graphrag_leve
+  PROC: e5_tfidf_lin
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6878
+    recall_at_1: 0.5738
+    recall_at_3: 0.7731
+    recall_at_5: 0.8429
+    recall_at_10: 0.8975
+    precisao_at_1: 0.5738
+  TEMPO_S:
+    pre: 1.75
+    proc: 1.12
+    pos: 0.0
+- POSICAO: 5
+  COMBINACAO: rede_semantica + e5 + medidas_graphrag_idf
+  PRE: rede_semantica
+  PROC: e5
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6862
+    recall_at_1: 0.5847
+    recall_at_3: 0.7724
+    recall_at_5: 0.8167
+    recall_at_10: 0.8756
+    precisao_at_1: 0.5847
+  TEMPO_S:
+    pre: 34.02
+    proc: 483.42
+    pos: 5.36
+- POSICAO: 6
+  COMBINACAO: graphrag + e5_tfidf_lin + medidas_graphrag_idf
+  PRE: graphrag
+  PROC: e5_tfidf_lin
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6856
+    recall_at_1: 0.576
+    recall_at_3: 0.7665
+    recall_at_5: 0.8342
+    recall_at_10: 0.8967
+    precisao_at_1: 0.576
+  TEMPO_S:
+    pre: 1.74
+    proc: 1.33
+    pos: 0.21
+- POSICAO: 7
+  COMBINACAO: graphrag_leve + e5 + medidas_graphrag_idf
+  PRE: graphrag_leve
+  PROC: e5
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6848
+    recall_at_1: 0.5847
+    recall_at_3: 0.7622
+    recall_at_5: 0.8211
+    recall_at_10: 0.8698
+    precisao_at_1: 0.5847
+  TEMPO_S:
+    pre: 1.75
+    proc: 454.44
+    pos: 0.3
+- POSICAO: 8
+  COMBINACAO: graphrag + e5_tfidf_lin + nada
+  PRE: graphrag
+  PROC: e5_tfidf_lin
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6595
+    recall_at_1: 0.5418
+    recall_at_3: 0.7425
+    recall_at_5: 0.8095
+    recall_at_10: 0.8909
+    precisao_at_1: 0.5418
+  TEMPO_S:
+    pre: 1.74
+    proc: 1.33
+    pos: 0.0
+- POSICAO: 9
+  COMBINACAO: graphrag + e5 + medidas_graphrag_idf
+  PRE: graphrag
+  PROC: e5
+  POS: medidas_graphrag_idf
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6628
+    recall_at_1: 0.5593
+    recall_at_3: 0.7396
+    recall_at_5: 0.8
+    recall_at_10: 0.8618
+    precisao_at_1: 0.5593
+  TEMPO_S:
+    pre: 1.74
+    proc: 492.99
+    pos: 0.34
+- POSICAO: 10
+  COMBINACAO: graphrag_leve + e5 + nada
+  PRE: graphrag_leve
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6412
+    recall_at_1: 0.5302
+    recall_at_3: 0.7156
+    recall_at_5: 0.7833
+    recall_at_10: 0.8531
+    precisao_at_1: 0.5302
+  TEMPO_S:
+    pre: 1.75
+    proc: 454.44
+    pos: 0.0
+- POSICAO: 11
+  COMBINACAO: rede_semantica + e5 + nada
+  PRE: rede_semantica
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6389
+    recall_at_1: 0.5302
+    recall_at_3: 0.712
+    recall_at_5: 0.7709
+    recall_at_10: 0.8516
+    precisao_at_1: 0.5302
+  TEMPO_S:
+    pre: 34.02
+    proc: 483.42
+    pos: 0.0
+- POSICAO: 12
+  COMBINACAO: graphrag + e5 + nada
+  PRE: graphrag
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6214
+    recall_at_1: 0.5127
+    recall_at_3: 0.6916
+    recall_at_5: 0.7542
+    recall_at_10: 0.8364
+    precisao_at_1: 0.5127
+  TEMPO_S:
+    pre: 1.74
+    proc: 492.99
+    pos: 0.01
+SEM_VALOR: []

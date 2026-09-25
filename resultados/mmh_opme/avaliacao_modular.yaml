@@ -1,0 +1,180 @@
+INFO:
+  DATA: '2026-09-22 01:31:17'
+  ARQUITETURA: pré-proc x processador x pós-proc (pipeline.jpg)
+  METRICA_MATRIZ: recall_at_3
+  TOP_K_CANDIDATOS: 20
+  DADOS:
+    DATASET: mmh_opme
+    GROUND_TRUTH: 20260408_ground_truth_mmh_opme_test.csv
+    N_CONSULTAS: 434
+    N_CATALOGO: 431
+    BLOCKING: nenhum — catálogo inteiro por consulta
+  PERFIL:
+    NOME: mmh
+    DESCRICAO: compras públicas hospitalares (Brasil / Material Médico Hospitalar)
+    TAMANHOS:
+      boilerplate: 13
+      stopwords: 41
+      abreviacoes: 20
+      variantes: 7
+      sinonimos: 5
+      hierarquia: 11
+      unidades: 17
+      familias: 14
+      atributos: 11
+      atributos_definidores: 15
+      regras_extracao: 9
+    PROVENIENCIA:
+      boilerplate: curado
+      stopwords: curado
+      sinonimos_regex: curado
+      abreviacoes: curado
+      variantes: curado
+      sinonimos: curado
+      hierarquia: curado
+      unidades: curado
+      atributos: curado
+      atributos_definidores: curado
+      extracao: curado
+      entidade_stopwords: curado
+      familias_extra: curado
+      medidas: curado
+    LACUNAS: []
+  MODULOS:
+    PRE:
+    - ID: nada
+      NOME: Pré-proc 1 (Nada)
+      DESCRICAO: texto cru, sem transformação
+    PROC:
+    - ID: e5
+      NOME: E5 bi-encoder
+      DESCRICAO: intfloat/multilingual-e5-base
+    POS:
+    - ID: nada
+      NOME: Pós-proc 1 (Nada)
+      DESCRICAO: ranking do processador, sem reordenação
+    - ID: unidades
+      NOME: Equivalência de unidades
+      DESCRICAO: valores + unidades de medida (peso 0.25)
+    - ID: unidades_graphrag
+      NOME: Unidades + GraphRAG
+      DESCRICAO: os dois sinais com peso igual (peso 0.25)
+    - ID: medidas
+      NOME: Medida tipada (com conversão)
+      DESCRICAO: valor+unidade convertidos à base da categoria, ancorado na consulta (aditivo, peso 0.05)
+    - ID: medidas_graphrag
+      NOME: Medida tipada + GraphRAG
+      DESCRICAO: medida convertida + cobertura de entidades do KG (a melhor combinação medida na grade)
+    - ID: medidas_unidades
+      NOME: Medida tipada + unidades
+      DESCRICAO: medida convertida e equivalência textual de unidade
+META_PRE:
+  nada:
+    transformacao: nenhuma
+MATRIZ:
+  nada:
+    e5: 0.735
+RANKING:
+- POSICAO: 1
+  COMBINACAO: nada + e5 + medidas_graphrag
+  PRE: nada
+  PROC: e5
+  POS: medidas_graphrag
+  METRICAS:
+    n_avaliados: 434
+    mrr: 0.6987
+    recall_at_1: 0.5806
+    recall_at_3: 0.7719
+    recall_at_5: 0.8548
+    recall_at_10: 0.924
+    precisao_at_1: 0.5806
+  TEMPO_S:
+    pre: 0.01
+    proc: 251.57
+    pos: 0.04
+- POSICAO: 2
+  COMBINACAO: nada + e5 + unidades_graphrag
+  PRE: nada
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 434
+    mrr: 0.6658
+    recall_at_1: 0.5369
+    recall_at_3: 0.7581
+    recall_at_5: 0.841
+    recall_at_10: 0.9124
+    precisao_at_1: 0.5369
+  TEMPO_S:
+    pre: 0.01
+    proc: 251.57
+    pos: 2.07
+- POSICAO: 3
+  COMBINACAO: nada + e5 + medidas_unidades
+  PRE: nada
+  PROC: e5
+  POS: medidas_unidades
+  METRICAS:
+    n_avaliados: 434
+    mrr: 0.6828
+    recall_at_1: 0.5599
+    recall_at_3: 0.7581
+    recall_at_5: 0.8479
+    recall_at_10: 0.9194
+    precisao_at_1: 0.5599
+  TEMPO_S:
+    pre: 0.01
+    proc: 251.57
+    pos: 0.05
+- POSICAO: 4
+  COMBINACAO: nada + e5 + unidades
+  PRE: nada
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 434
+    mrr: 0.6671
+    recall_at_1: 0.5438
+    recall_at_3: 0.7419
+    recall_at_5: 0.8387
+    recall_at_10: 0.9147
+    precisao_at_1: 0.5438
+  TEMPO_S:
+    pre: 0.01
+    proc: 251.57
+    pos: 0.07
+- POSICAO: 5
+  COMBINACAO: nada + e5 + medidas
+  PRE: nada
+  PROC: e5
+  POS: medidas
+  METRICAS:
+    n_avaliados: 434
+    mrr: 0.6746
+    recall_at_1: 0.5484
+    recall_at_3: 0.7419
+    recall_at_5: 0.8456
+    recall_at_10: 0.9194
+    precisao_at_1: 0.5484
+  TEMPO_S:
+    pre: 0.01
+    proc: 251.57
+    pos: 0.6
+- POSICAO: 6
+  COMBINACAO: nada + e5 + nada
+  PRE: nada
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 434
+    mrr: 0.6536
+    recall_at_1: 0.5253
+    recall_at_3: 0.735
+    recall_at_5: 0.8341
+    recall_at_10: 0.9078
+    precisao_at_1: 0.5253
+  TEMPO_S:
+    pre: 0.01
+    proc: 251.57
+    pos: 0.0
+SEM_VALOR: []
