@@ -113,8 +113,21 @@ def preparar_corpus(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> int:
 # ---------------------------------------------------------------------------
 
 def configurar_env(api_key: str) -> None:
-    """Grava .env no workspace com GRAPHRAG_API_KEY."""
+    """
+    Grava .env no workspace com GRAPHRAG_API_KEY.
+
+    Chave vazia não sobrescreve: um processo sem a variável (a grade rodada sem
+    o .env, por exemplo) apagaria a chave que o pipeline gravou e derrubaria o
+    `load_config` de todo mundo com "validation error: api_key".
+    """
     env_path = ws_graphrag() / ".env"
+    if not api_key:
+        if env_path.exists():
+            log.warning("[GraphRAG] OPENAI_API_KEY ausente neste processo — mantendo o "
+                        ".env já existente do workspace.")
+        else:
+            log.warning("[GraphRAG] OPENAI_API_KEY ausente — workspace sem .env.")
+        return
     env_path.write_text(f"GRAPHRAG_API_KEY={api_key}\n", encoding="utf-8")
     log.info("[GraphRAG] .env configurado em %s", env_path)
 
@@ -126,6 +139,61 @@ def configurar_env(api_key: str) -> None:
 def ja_indexado() -> bool:
     """True se o índice já foi gerado com sucesso."""
     return sentinela_indexado().exists()
+
+
+# Modelos do índice oficial. O chat é o mesmo da fase [2]; o embedding pequeno
+# basta para itens de catálogo (frases curtas) e custa 1/6 do grande.
+GR_MODELO_CHAT = "gpt-4o-mini"
+GR_MODELO_EMBEDDING = "text-embedding-3-small"
+
+# Tipos de entidade que o extrator do GraphRAG procura. O padrão do template
+# (organization, person, geo, event) é de prosa jornalística e não acha nada
+# num rótulo de catálogo; estes são os eixos pelos quais dois itens se
+# igualam ou se distinguem.
+GR_TIPOS_ENTIDADE = ["produto", "material", "medida", "aplicacao", "componente", "modelo"]
+
+
+def garantir_workspace() -> Path:
+    """
+    Cria o workspace do Microsoft GraphRAG se ainda não existe.
+
+    `graphrag init` gera settings.yaml e os prompts; em seguida o arquivo é
+    ajustado para este corpus: tipos de entidade de catálogo em vez dos de
+    notícia, e snapshot do grafo em GraphML para inspeção. Sem isto a fase [6]
+    dependia de alguém ter rodado o init à mão — e o workspace é ignorado pelo
+    git, então cada clone começava sem ele.
+    """
+    ws = ws_graphrag()
+    settings = ws / "settings.yaml"
+    if settings.exists():
+        return settings
+    ws.mkdir(parents=True, exist_ok=True)
+    log.info("[GraphRAG] Criando workspace em %s (graphrag init)...", ws)
+    result = subprocess.run(
+        ["graphrag", "init", "--root", str(ws), "--model", GR_MODELO_CHAT,
+         "--embedding", GR_MODELO_EMBEDDING, "--force"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0 or not settings.exists():
+        raise RuntimeError(
+            f"graphrag init falhou (código {result.returncode}): {result.stderr[:400]}")
+
+    import yaml
+
+    cfg = yaml.safe_load(settings.read_text(encoding="utf-8")) or {}
+    cfg.setdefault("extract_graph", {})["entity_types"] = list(GR_TIPOS_ENTIDADE)
+    cfg.setdefault("snapshots", {})["graphml"] = True
+    # Cada item é um documento curto: um chunk por documento, sem sobreposição.
+    cfg.setdefault("chunking", {}).update({"size": 600, "overlap": 0})
+    settings.write_text(
+        "# Gerado por catalogo_match.graphrag.garantir_workspace a partir de\n"
+        "# `graphrag init`; entity_types, chunking e snapshots ajustados ao corpus.\n"
+        + yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    log.info("[GraphRAG] settings.yaml pronto (chat=%s, embedding=%s, entidades=%s).",
+             GR_MODELO_CHAT, GR_MODELO_EMBEDDING, ", ".join(GR_TIPOS_ENTIDADE))
+    return settings
 
 
 def indexar(verbose: bool = True) -> None:
@@ -229,6 +297,7 @@ def inicializar(consultas: pd.DataFrame, catalogo: pd.DataFrame,
     """
     from graphrag.config.load_config import load_config
 
+    garantir_workspace()
     preparar_corpus(consultas, catalogo)
     configurar_env(api_key)
 
@@ -331,10 +400,18 @@ def construir_kg(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> GrafoConhec
     indice_invertido: dict[str, list[int]] = defaultdict(list)
 
     col_pdm_e = "pdm_ancoragem" if "pdm_ancoragem" in consultas.columns else None
+    # Atributos extraídos pela fase [2] (LLM ou regex), quando o pipeline os
+    # traz: viram entidades tipadas (`principio_ativo::PARACETAMOL`) dos dois
+    # lados. Na grade modular a coluna não existe e o KG fica só com o rótulo
+    # estruturado do catálogo + tokens — o comportamento original.
+    tem_attr_e = "atributos" in consultas.columns
+    tem_attr_c = "atributos" in catalogo.columns
 
     for i, row in enumerate(consultas.itertuples(index=False)):
         pdm = (getattr(row, col_pdm_e, "") or "") if col_pdm_e else ""
-        ents = _entidades_item(getattr(row, "item_efisco", "") or "", None, pdm)
+        attr_e = getattr(row, "atributos", None) if tem_attr_e else None
+        ents = _entidades_item(getattr(row, "item_efisco", "") or "",
+                               attr_e if isinstance(attr_e, dict) else None, pdm)
         ents_consulta[i] = ents
         G.add_node(f"e:{i}", tipo="efisco", idx=i)
         for ent in ents:
@@ -346,6 +423,10 @@ def construir_kg(consultas: pd.DataFrame, catalogo: pd.DataFrame) -> GrafoConhec
         atributos = getattr(row, "catmat_atributos", None)
         if not isinstance(atributos, dict):
             atributos = extrair_atributos_catmat(texto)
+        if tem_attr_c:
+            canon = getattr(row, "atributos", None)
+            if isinstance(canon, dict) and canon:
+                atributos = {**atributos, **{k: v for k, v in canon.items() if v}}
         pdm = (getattr(row, "pdm", "") or "") or atributos.get("tipo_produto", "")
         ents = _entidades_item(texto, atributos, pdm)
         ents_catalogo[j] = ents

@@ -15,22 +15,28 @@ sao declarados em config/perfis/ e config/datasets/ e resolvidos por
     corpus = carregar_corpus()
 
 Modulos:
-    config                 DatasetSpec + PerfilDominio + inducao do perfil
+    config                 DatasetSpec + PerfilDominio (+ heranca) + inducao do perfil
     preprocessamento       normalizacao de texto, atributos do rotulo CATMAT
+    caracteristicas        medida tipada (valor + unidade convertida) do texto livre
     rede_semantica         fase [1]: grafo lexico de dominio + expansao
     ontologia_owl          fase [4]: TBox OWL + SWRL + reasoner Pellet
+    taxonomia              alinhamento das taxonomias e-Fisco <-> CATMAT (LOO e rotulo)
     graphrag               fase [6] e os modulos GraphRAG da grade
     pipeline               orquestrador das fases [0]-[9]
-    avaliacao_modular      grade pre x proc x pos + ranking de combinacoes
+    avaliacao_modular      grade pre x proc x pos (+ fusao de rankings) + ranking
+    diagnostico            onde o R@3 se perde: faixas, quebras e comparacoes
     servico_rede_semantica servico HTTP do lexico (FastAPI)
 """
 
 __all__ = [
     "config",
     "preprocessamento",
+    "caracteristicas",
     "rede_semantica",
     "ontologia_owl",
+    "taxonomia",
     "graphrag",
     "pipeline",
     "avaliacao_modular",
+    "diagnostico",
 ]

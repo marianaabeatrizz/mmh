@@ -1,0 +1,43 @@
+INFO | Dataset: bigdata_profs | perfil: mmh
+INFO | Corpus [bigdata_profs]: 1375 consultas x 1297 itens de catálogo (1375 com gabarito).
+INFO | Grade: 2 pré × 1 proc × 3 pós = 6 combinações.
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_nada_f42766a71c1cc825.npz
+INFO |   nada           | e5        | nada      -> MRR 0.6748  R@1 0.569  R@3 0.740
+INFO | [pós/medidas] consultas com medida: 761/1375 | catálogo: 639/1297 | bases: MM=654, ML=181, G_GAUGE=49, FR=40
+INFO |   nada           | e5        | medidas   -> MRR 0.6673  R@1 0.556  R@3 0.738
+INFO | [GraphRAG/pré] KG: 12380 nós, 32261 arestas, 9708 entidades, 98 comunidades
+INFO |   nada           | e5        | medidas_graphrag -> MRR 0.7019  R@1 0.599  R@3 0.772
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_basico_d3935162a3ff8289.npz
+INFO |   basico         | e5        | nada      -> MRR 0.6689  R@1 0.562  R@3 0.743
+INFO |   basico         | e5        | medidas   -> MRR 0.6588  R@1 0.548  R@3 0.738
+INFO |   basico         | e5        | medidas_graphrag -> MRR 0.6926  R@1 0.586  R@3 0.778
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\Educação\mmh\catalogo_match\avaliacao_modular.py", line 1530, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\Educação\mmh\catalogo_match\avaliacao_modular.py", line 1523, in main
+    exportar(corpus, combinacoes, ordenadas, matriz, args.metrica,
+    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+             args.top_k, ids_pre, ids_proc, ids_pos)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Educação\mmh\catalogo_match\avaliacao_modular.py", line 1380, in exportar
+    "MEDIDAS": ctx.get("_medidas_resumo"),
+               ^^^
+NameError: name 'ctx' is not defined
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                            e5
+nada                   0.7404*
+basico                 0.7425*
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   basico + e5 + medidas_graphrag                    0.7782   0.586   0.778   0.885     1.2
+2   nada + e5 + medidas_graphrag                      0.7724   0.599   0.772   0.897     3.2
+3   basico + e5 + nada                                0.7425   0.562   0.743   0.869     1.1
+4   nada + e5 + nada                                  0.7404   0.569   0.740   0.881     0.1
+5   nada + e5 + medidas                               0.7382   0.556   0.738   0.886     2.0
+6   basico + e5 + medidas                             0.7382   0.548   0.738   0.876     1.1

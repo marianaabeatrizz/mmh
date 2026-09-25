@@ -28,7 +28,10 @@ rapidfuzz==3.14.5              # similaridade de string (fallback do estágio 2)
 
 # --- Camada de percepção (LLM) ---
 openai==2.41.1           # extração de atributos e adjudicação GraphRAG
-graphrag>=3.1.1          # Microsoft GraphRAG (fase [6]: indexação + local search)
+graphrag==3.1.2          # Microsoft GraphRAG (fase [6]: indexação + local search).
+                         # Instala litellm, lancedb, spacy e ~60 dependências; o
+                         # workspace por dataset é criado pelo próprio pipeline
+                         # (catalogo_match.graphrag.garantir_workspace).
 
 # --- Serviço (§3.8) ---
 fastapi==0.141.1

@@ -1,0 +1,397 @@
+{
+  "fase0": {
+    "n_pares_gabarito": 1392,
+    "n_ok_sem_flags": 157,
+    "n_catalogo": 1297,
+    "n_consultas": 1375,
+    "n_classes_efisco": 163,
+    "n_classes_catmat": 156,
+    "n_pdms_catalogo": 724
+  },
+  "fase1": {
+    "n_nos": 7690,
+    "n_arestas": 37249,
+    "n_com_pdm": 1374,
+    "taxa_oov": 0.2571126558692848
+  },
+  "fase2": {
+    "fonte_extracao": {
+      "llm": 2672,
+      "regex": 0,
+      "erros_llm": 0
+    },
+    "n_completos": 1230,
+    "escore_medio_completude": 0.9221818181818182,
+    "n_consultas_com_atributos": 1363,
+    "n_catalogo_com_atributos": 1297
+  },
+  "fase3": {
+    "n_pares_candidatos": 94669,
+    "bloco_medio": 68.85018181818182,
+    "bloco_max": 129,
+    "origem_bloco": {
+      "pdm": 1374,
+      "lexical": 1
+    },
+    "recall_blocking": 0.968
+  },
+  "fase4": {
+    "n_classes_pdm": 744,
+    "n_propriedades": 21,
+    "n_individuos": 2672,
+    "n_regras_swrl": 22,
+    "por_deducao": {
+      "incompleto": 86136,
+      "equivalenteA": 558,
+      "veto": 7954,
+      "broadMatch": 21
+    }
+  },
+  "fase5": {
+    "modelo_embedding": "intfloat/multilingual-e5-base",
+    "encoder_assimetrico": true,
+    "fusao": {
+      "e5": 0.7,
+      "tfidf": 0.15,
+      "tfidf_char": 0.15
+    },
+    "texto_neural": "efisco_processado",
+    "cross_encoder": "desligado",
+    "n_pares_pontuados": 27500,
+    "score_cosine_medio": 0.8623118904807351,
+    "score_fusao_medio": 0.6420122022498738,
+    "score_cross_medio": 0.6420122022498738,
+    "score_neural_medio": 0.6420122022498738
+  },
+  "fase5b": {
+    "ativa": true,
+    "peso": 0.05,
+    "pesos_relativos": {
+      "medidas": 0.6,
+      "graphrag_idf": 1.0,
+      "taxonomia": 0.3,
+      "ontologia": 0.6
+    },
+    "medidas": {
+      "consultas": {
+        "com_medida": 1015,
+        "total": 1375,
+        "por_base": {
+          "MM": 654,
+          "ML": 181,
+          "G": 159,
+          "PCT": 137,
+          "V": 72,
+          "MG_ML": 54,
+          "G_GAUGE": 49,
+          "FR": 40,
+          "W": 20,
+          "UI": 7
+        }
+      },
+      "catalogo": {
+        "com_medida": 865,
+        "total": 1297,
+        "por_base": {
+          "MM": 559,
+          "G": 139,
+          "ML": 86,
+          "PCT": 82,
+          "FR": 55,
+          "MG_ML": 42,
+          "G_GAUGE": 38,
+          "V": 36,
+          "W": 18,
+          "UI": 7
+        }
+      }
+    },
+    "kg": {
+      "n_nos": 15442,
+      "n_entidades": 8572,
+      "n_comunidades": 38
+    },
+    "taxonomia": {
+      "n_classes_efisco": 162,
+      "n_classes_catmat": 154,
+      "n_pares_classe_distintos": 324,
+      "n_grupos_efisco": 46,
+      "n_pares_grupo_distintos": 148,
+      "consultas_com_classe": 1350,
+      "catalogo_com_classe": 1297,
+      "consultas": 1375,
+      "correto_com_compatibilidade": 1263,
+      "classe_sem_historico_loo": 133,
+      "fracao_correto_compativel": 0.9185,
+      "fonte": "histórico de vínculos, leave-one-out"
+    },
+    "ontologia": {
+      "pares_com_deducao_positiva": 482,
+      "bonus": {
+        "equivalenteA": 1.0,
+        "broadMatch": 0.5
+      }
+    },
+    "pares_com_sinal": 25073
+  },
+  "fase6": {
+    "graphrag_microsoft": false,
+    "n_arestas_sim": 2712,
+    "n_zona_cinzenta": 904,
+    "criterio_zona": "margem top1-top2 < 0.05, as menores primeiro",
+    "modo_adjudicacao": "lista",
+    "k_lista": 5,
+    "peso_adjudicacao_lista": 0.1,
+    "adjudicacao_llm": 500,
+    "adjudicacao_votacao": 180,
+    "adjudicacao_erros": 0
+  },
+  "fase7": {
+    "n_nos": 3396,
+    "n_arestas": 30171,
+    "n_equivalenteA": 762,
+    "n_candidatoA": 26738
+  },
+  "fase8": {
+    "n_pares": 27500,
+    "n_decisoes": 1375,
+    "score_medio_top1": 0.748677090909091,
+    "por_confianca": {
+      "Baixa": 598,
+      "Alta": 473,
+      "Média": 304
+    }
+  },
+  "fase8b": {
+    "n_explicacoes": 60
+  },
+  "fase9": {
+    "n_comunidades": 174,
+    "tamanhos_comunidades": [
+      55,
+      33,
+      25,
+      12,
+      10,
+      9,
+      9,
+      8,
+      8,
+      7,
+      6,
+      6,
+      6,
+      6,
+      6,
+      5,
+      5,
+      5,
+      5,
+      5
+    ],
+    "n_grupos_duplicatas": 91,
+    "n_anomalias": 414
+  },
+  "avaliacao": {
+    "n_avaliados": 1375,
+    "mrr": 0.7834094972013642,
+    "recall_at_1": 0.6989090909090909,
+    "recall_at_3": 0.8523636363636363,
+    "recall_at_5": 0.888,
+    "recall_at_10": 0.9229090909090909,
+    "recall_blocking": 0.968,
+    "precisao_at_1": 0.6989090909090909,
+    "ablacoes": {
+      "cosseno E5 (só o bi-encoder)": {
+        "n_avaliados": 1375,
+        "mrr": 0.6760498421614671,
+        "recall_at_1": 0.5636363636363636,
+        "recall_at_3": 0.7505454545454545,
+        "recall_at_5": 0.8181818181818182,
+        "recall_at_10": 0.8872727272727273
+      },
+      "fusão E5+TF-IDF (estágio 1)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7433258535285283,
+        "recall_at_1": 0.6443636363636364,
+        "recall_at_3": 0.8189090909090909,
+        "recall_at_5": 0.8756363636363637,
+        "recall_at_10": 0.9178181818181819
+      },
+      "+ cross-encoder (estágio 2)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7433258535285283,
+        "recall_at_1": 0.6443636363636364,
+        "recall_at_3": 0.8189090909090909,
+        "recall_at_5": 0.8756363636363637,
+        "recall_at_10": 0.9178181818181819
+      },
+      "+ sinais simbólicos (fase 5b)": {
+        "n_avaliados": 1375,
+        "mrr": 0.7657885474440508,
+        "recall_at_1": 0.672,
+        "recall_at_3": 0.84,
+        "recall_at_5": 0.885090909090909,
+        "recall_at_10": 0.9229090909090909
+      },
+      "+ adjudicação (fase 6) = score final": {
+        "n_avaliados": 1375,
+        "mrr": 0.7834094972013642,
+        "recall_at_1": 0.6989090909090909,
+        "recall_at_3": 0.8523636363636363,
+        "recall_at_5": 0.888,
+        "recall_at_10": 0.9229090909090909
+      }
+    },
+    "por_confianca": {
+      "Alta": {
+        "n": 473,
+        "fracao": 0.344,
+        "precisao_at_1": 0.9619,
+        "recall_at_3": 0.9831
+      },
+      "Média": {
+        "n": 304,
+        "fracao": 0.2211,
+        "precisao_at_1": 0.7599,
+        "recall_at_3": 0.9079
+      },
+      "Baixa": {
+        "n": 598,
+        "fracao": 0.4349,
+        "precisao_at_1": 0.4599,
+        "recall_at_3": 0.7207
+      }
+    }
+  },
+  "tempos_execucao": {
+    "fase_0_fontes": {
+      "wall_s": 2.728,
+      "cpu_s": 2.375
+    },
+    "fase_1_rede_semantica": {
+      "wall_s": 86.004,
+      "cpu_s": 90.438
+    },
+    "fase_2_extracao": {
+      "wall_s": 2.277,
+      "cpu_s": 1.609
+    },
+    "fase_3_blocking": {
+      "wall_s": 6.854,
+      "cpu_s": 6.281
+    },
+    "reasoner_pellet": {
+      "wall_s": 41.675,
+      "cpu_s": 5.734
+    },
+    "fase_4_ontologia": {
+      "wall_s": 47.706,
+      "cpu_s": 11.25
+    },
+    "fase_5_matcher_neural": {
+      "wall_s": 0.496,
+      "cpu_s": 0.469
+    },
+    "fase_5b_sinais_simbolicos": {
+      "wall_s": 4.707,
+      "cpu_s": 4.141
+    },
+    "fase_6_graphrag": {
+      "wall_s": 11.717,
+      "cpu_s": 10.594
+    },
+    "fase_8_confianca": {
+      "wall_s": 1.555,
+      "cpu_s": 1.359
+    },
+    "avaliacao_retrieval": {
+      "wall_s": 3.72,
+      "cpu_s": 3.375
+    },
+    "fase_7_grafo_unificado": {
+      "wall_s": 5.89,
+      "cpu_s": 5.156
+    },
+    "fase_8b_explicabilidade": {
+      "wall_s": 0.1,
+      "cpu_s": 0.078
+    },
+    "fase_9_analise_global": {
+      "wall_s": 1.321,
+      "cpu_s": 1.203
+    }
+  },
+  "config": {
+    "modelo_embedding": "intfloat/multilingual-e5-base",
+    "modelo_cross_encoder": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+    "modelo_llm": "gpt-4o-mini",
+    "k_rerank": 20,
+    "pesos_score_final": {
+      "ontologia": 0.0,
+      "neural": 0.8,
+      "graphrag": 0.2
+    },
+    "fator_veto": 1.0,
+    "pesos_fusao": {
+      "e5": 0.7,
+      "tfidf": 0.15,
+      "tfidf_char": 0.15
+    },
+    "texto_neural": "basico",
+    "peso_sinais": 0.05,
+    "pesos_rel_sinais": {
+      "medidas": 0.6,
+      "graphrag_idf": 1.0,
+      "taxonomia": 0.3,
+      "ontologia": 0.6
+    },
+    "usar_llm": true,
+    "usar_rede_semantica": true,
+    "usar_cross_encoder": false,
+    "usar_sinais": true,
+    "llm_max_adjudicacoes": 500,
+    "adjudicacao": "lista",
+    "k_lista": 5,
+    "peso_adjudicacao_lista": 0.1,
+    "contexto_ms": false,
+    "limiares_margem": {
+      "alta": 0.05,
+      "media": 0.02
+    }
+  },
+  "perfil": {
+    "NOME": "compras_publicas",
+    "DESCRICAO": "compras públicas (Brasil) — material hospitalar, medicamentos e bens de uso geral",
+    "TAMANHOS": {
+      "boilerplate": 13,
+      "stopwords": 41,
+      "abreviacoes": 20,
+      "variantes": 7,
+      "sinonimos": 5,
+      "hierarquia": 11,
+      "unidades": 23,
+      "familias": 27,
+      "atributos": 21,
+      "atributos_definidores": 22,
+      "regras_extracao": 9
+    },
+    "PROVENIENCIA": {
+      "boilerplate": "curado",
+      "stopwords": "curado",
+      "sinonimos_regex": "curado",
+      "abreviacoes": "curado",
+      "variantes": "curado",
+      "sinonimos": "curado",
+      "hierarquia": "curado",
+      "unidades": "curado",
+      "atributos": "curado",
+      "atributos_definidores": "curado",
+      "extracao": "curado",
+      "entidade_stopwords": "curado",
+      "familias_extra": "curado",
+      "medidas": "curado"
+    },
+    "LACUNAS": []
+  }
+}

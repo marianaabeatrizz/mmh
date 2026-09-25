@@ -10,10 +10,15 @@ Implementação integral do fluxo fim a fim descrito em:
 [2] Extração         — texto livre -> atributos PDM (LLM; regex como fallback);
                        validação de esquema SHACL (pyshacl) contra as
                        características definidoras por família (§2.2)
-[3] Blocking         — GERAÇÃO DE CANDIDATOS por Classe/PDM + subsunção
+[3] Blocking         — GERAÇÃO DE CANDIDATOS por Classe/PDM + subsunção + top-50
+                       pela similaridade FUNDIDA (E5 + TF-IDF palavra + caractere)
 [4] Ontologia        — OWL + reasoner Pellet (SWRL da §2.2) sobre os candidatos
-[5] Matcher neural   — bi-encoder assimétrico (E5) + cross-encoder (2 estágios)
-[6] GraphRAG         — adjudicação ancorada no grafo + LLM na zona cinzenta
+[5] Matcher neural   — estágio 1 = fusão léxico-densa; estágio 2 = cross-encoder
+                       (opcional, --sem-cross: medido como prejudicial)
+[5b] Sinais          — medida tipada + cobertura de entidades (IDF) + taxonomia
+                       LOO somados ao score neural (peso 0,05)
+[6] GraphRAG         — adjudicação ancorada no grafo + LLM na zona cinzenta, da
+                       menor margem para a maior (--max-adjudicacoes 0 desliga)
 [7] Grafo unificado  — itens + PDMs + arestas :equivalenteA (só as que passam)
 [8] Confiança        — ranqueia candidatos, escolhe o top-1, Alta/Média/Baixa
 [*] Avaliação        — recall@k, MRR, precisão do top-1, recall do blocking
@@ -37,6 +42,10 @@ unidades, esquema de atributos, papéis nos prompts) vem do PERFIL, e o que é
 corpus (arquivos, separador, saídas) vem do DATASET. Ver catalogo_match/config.py
 e config/{datasets,perfis}/.
 
+A avaliação reporta, além das métricas do ranking final, a ABLAÇÃO por camada:
+o mesmo top-K reordenado por cosseno E5, fusão, cross-encoder, sinais, fase [6]
+e score final — o que cada fase acrescentou, medido numa só execução.
+
 Uso:
     python -m catalogo_match.pipeline                       # dataset padrão
     python -m catalogo_match.pipeline --dataset mmh_opme    # outro corpus
@@ -44,6 +53,11 @@ Uso:
     python -m catalogo_match.pipeline --smoke               # testa a conexão
     python -m catalogo_match.pipeline --sem-llm             # offline (regex do perfil)
     python -m catalogo_match.pipeline --sem-rede            # ablação §3.10
+    python -m catalogo_match.pipeline --dataset bigdata_profs   # padrões = a configuração medida
+                                                                # como melhor (fusão, sinais, sem
+                                                                # cross, adjudicação em lista)
+    python -m catalogo_match.pipeline --adjudicacao par --contexto-ms --cross   # o desenho antigo
+    python -m catalogo_match.pipeline --saida teste --peso-ontologia 0.35 --fator-veto 0.25
 """
 
 import re
@@ -112,29 +126,9 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
 
-def _carregar_dotenv(nome: str = ".env") -> None:
-    """Carrega variáveis de um arquivo .env local para os.environ, SEM depender
-    de python-dotenv. Não sobrescreve variáveis já no ambiente (setdefault)."""
-    candidatos = [Path(__file__).parent / nome, Path.cwd() / nome]
-    vistos = set()
-    for p in candidatos:
-        p = p.resolve()
-        if p in vistos or not p.exists():
-            continue
-        vistos.add(p)
-        try:
-            for linha in p.read_text(encoding="utf-8").splitlines():
-                linha = linha.strip()
-                if not linha or linha.startswith("#") or "=" not in linha:
-                    continue
-                chave, _, valor = linha.partition("=")
-                chave = chave.strip()
-                valor = valor.strip().strip('"').strip("'")
-                if chave:
-                    os.environ.setdefault(chave, valor)
-        except OSError as exc:
-            log.warning(".env ilegível (%s): %s", p, exc)
-
+# O `.env` (OPENAI_API_KEY) é carregado por `config.py` no import do pacote,
+# para que grade, varredura e serviço vejam a mesma chave que o pipeline.
+from .config import carregar_dotenv as _carregar_dotenv
 
 _carregar_dotenv()
 
@@ -155,10 +149,49 @@ LLM_MODEL_PADRAO = "gpt-4o-mini"
 
 # Estágio 1 (barato): bi-encoder sobre TODOS os candidatos do bloco.
 # Estágio 2 (caro): cross-encoder só sobre os K melhores de cada consulta.
-K_RERANK          = 15     # candidatos que chegam ao cross-encoder
+K_RERANK          = 20     # candidatos que chegam ao cross-encoder e aos sinais
 K_AVALIACAO       = 10     # maior k reportado em recall@k
 MAX_CANDIDATOS    = 400    # teto por consulta (protege blocos gigantes)
-_N_SEM_BLOCKING   = 50    # candidatos cross-PDM por embedding (estratégia 6)
+_N_SEM_BLOCKING   = 50    # candidatos cross-PDM por similaridade fundida (estratégia 6)
+
+# --- Fusão léxico-densa (grade modular: processador `e5_tfidf_char_lin`) ----
+# A similaridade que guia o blocking (estratégia 6), o corte dos blocos grandes
+# e o estágio 1 do matcher é a soma de cossenos E5 + TF-IDF de palavra + TF-IDF
+# de caractere. Medido na grade sem blocking: R@3 de 74,3% (E5) para 81,9% no
+# bigdata_profs e de 60,7% para 72,1% no MMH. Ver docs/RESULTADOS-BIGDATA-PROFS.md.
+PESOS_FUSAO = {"e5": 0.70, "tfidf": 0.15, "tfidf_char": 0.15}
+
+# Texto que alimenta a fusão: `basico` (efisco_processado) ou `rede`
+# (doc_virtual_expandido, a expansão da fase [1]). A grade mediu a expansão
+# 3 pp abaixo da normalização básica nos dois datasets; a rede continua
+# ancorando o PDM (blocking) e servindo o léxico curado ao `basico`.
+TEXTO_NEURAL = "basico"
+
+# --- Sinais simbólicos sobre o top-K (grade: pós `combinado_calibrado`) -----
+# Somados ao score neural com peso pequeno: medida tipada convertida,
+# cobertura de entidades do KG ponderada por IDF, compatibilidade de classe
+# entre as taxonomias (histórico de vínculos, leave-one-out) e a dedução
+# ontológica da fase [4] (equivalenteA = 1, broadMatch = 0,5). Na execução D,
+# 86% dos top-1 com `equivalenteA` estavam certos, contra 65% dos `incompleto`:
+# a regra SWRL informa — só não podia entrar na escala em que entrava.
+PESO_SINAIS = 0.05
+PESOS_REL_SINAIS = {"medidas": 0.6, "graphrag_idf": 1.0, "taxonomia": 0.3, "ontologia": 0.6}
+BONUS_DEDUCAO = {"equivalenteA": 1.0, "broadMatch": 0.5}
+
+# --- Fase [6]: como a LLM adjudica ------------------------------------------
+#   lista   — vê os K_LISTA melhores candidatos de uma consulta de uma vez e
+#             pontua cada um (padrão). Julgar um par isolado ("é o mesmo item?")
+#             rebaixava corretos com especificação incompleta: −2,2 a −4,8 pp.
+#   par     — o comportamento original (um par por consulta, top-1).
+#   nenhuma — sem LLM na fase [6] (votação por vizinhos TF-IDF).
+ADJUDICACAO = "lista"
+K_LISTA = 5
+# score_graphrag = (1-p) neural + p nota da LLM, e o score final pesa 0,2 nele.
+# Varrido no bigdata_profs (etapa 18): p = 0,1 e 0,2 dão R@3 85,2% (contra 84,0%
+# sem adjudicação); 0,3 já cai para 83,1% e 0,5 para 80,9% — a nota da LLM é
+# boa para DESEMPATAR o topo, não para substituir a similaridade.
+PESO_ADJUDICACAO_LISTA = 0.1
+USAR_CONTEXTO_MS = False         # --contexto-ms: liga o índice Microsoft GraphRAG
 
 # Limiares de confiança (§4.6)
 LIMIAR_ALTA   = 0.75
@@ -167,12 +200,29 @@ LIMIAR_MEDIA  = 0.50
 # Zona cinzenta que o GraphRAG adjudica (§4.2-2)
 ZONA_CINZENTA = (0.25, LIMIAR_ALTA)
 
-# Pesos do escore final (§4.1)
+# Composição do escore final (§4.1), como ficou depois da medição no bigdata_profs
+# (docs/RESULTADOS-BIGDATA-PROFS.md, §9): a dedução ontológica deixou de entrar
+# como fatia convexa de 0,35 — nessa escala, um `equivalenteA` (1,0) contra um
+# `incompleto` (0,3) valia mais que todo o espalhamento da similaridade fundida e
+# puxava pares errados ao topo (−1,8 pp de R@3) — e passou a ser um SINAL ADITIVO
+# da fase [5b], na escala dos outros. O peso convexo continua disponível
+# (--peso-ontologia) para reproduzir a composição antiga.
 PESOS_SCORE_FINAL = {
-    "ontologia": 0.35,
-    "neural":    0.45,
+    "ontologia": 0.0,
+    "neural":    0.80,
     "graphrag":  0.20,
 }
+# Veto: entre os 71 top-1 vetados da execução D, 35 estavam certos e 36 errados
+# — o veto não separa nada neste corpus. Fica desligado (1,0); --fator-veto 0.25
+# reativa a penalidade original.
+FATOR_VETO = 1.0
+
+# Faixas de confiança pela MARGEM entre o 1º e o 2º candidato (score neural),
+# medida contra o gabarito na execução D: margem >= 0,05 -> P@1 ~0,93-0,99;
+# 0,02-0,05 -> ~0,73; < 0,02 -> ~0,41. O limiar absoluto (0,75/0,50) do MMH não
+# separa nada na escala do score fundido (81% das consultas caíam em "Média").
+LIMIAR_MARGEM_ALTA  = 0.05
+LIMIAR_MARGEM_MEDIA = 0.02
 
 # Chaves canônicas do esquema de atributos: são as do PERFIL de domínio. Eram
 # uma tupla literal aqui (calibre, bisel, conector...), o que amarrava o esquema
@@ -203,9 +253,15 @@ def cache_graphrag_path() -> str:
 # Teto de chamadas LLM por execução na fase [6] (custo previsível)
 LLM_MAX_ADJUDICACOES = 500
 
+# Paralelismo das chamadas de extração da fase [2] (uma por texto único)
+LLM_WORKERS = 8
+
 # Flags de execução (definidas por linha de comando)
-USAR_LLM  = True
-USAR_REDE = True
+USAR_LLM    = True
+USAR_REDE   = True
+USAR_CROSS  = False   # estágio 2 do matcher (cross-encoder): medido como prejudicial
+                      # (−1,7 pp de R@3, 33 min de CPU); --cross religa
+USAR_SINAIS = True    # fase [5b]; --sem-sinais desliga
 
 
 # ---------------------------------------------------------------------------
@@ -332,9 +388,14 @@ def fase_0_fontes() -> dict:
     # perfil já traz o bloco). Precisa ser antes das fases que leem o domínio.
     ctx.completar_com_dados(df)
 
+    # Colunas opcionais de taxonomia/proveniência: quando o CSV as traz, os
+    # sinais da fase [5b] e a análise as usam.
+    extras_cat = [c for c in ("grupo_catmat",) if c in df.columns]
+    extras_q = [c for c in ("grupo_efisco", "origem") if c in df.columns]
+
     # --- Catálogo CATMAT (universo de busca) -------------------------------
     catalogo = (
-        df[["codigo_catmat", "item_catmat", "classe_catmat"]]
+        df[["codigo_catmat", "item_catmat", "classe_catmat", *extras_cat]]
         .drop_duplicates(subset="codigo_catmat")
         .reset_index(drop=True)
     )
@@ -347,7 +408,7 @@ def fase_0_fontes() -> dict:
 
     # --- Consultas e-Fisco -------------------------------------------------
     consultas = (
-        df[["codigo_efisco", "item_efisco", "classe_efisco"]]
+        df[["codigo_efisco", "item_efisco", "classe_efisco", *extras_q]]
         .drop_duplicates(subset="codigo_efisco")
         .reset_index(drop=True)
     )
@@ -581,9 +642,12 @@ def extrair_atributos_llm(texto: str, client, cache: dict,
         "Todos os valores em MAIÚSCULAS e sem acento.\n\n"
         f"Descrição do item:\n{str(texto)[:400]}"
     )
+    # 320 tokens: com o esquema estendido do perfil multi-domínio (19 chaves),
+    # 200 cortava o JSON no meio ("Unterminated string") em ~1% dos itens, que
+    # caíam para a regex sem necessidade.
     resp = client.chat.completions.create(
         model=model,
-        max_tokens=200,
+        max_tokens=320,
         response_format={"type": "json_object"},
         messages=[{"role": "user", "content": prompt}],
     )
@@ -749,26 +813,46 @@ def fase_2_extracao(estado: dict) -> dict:
     cache = _carregar_cache_extracao(cache_extracao_path())
     stats_fonte = {"llm": 0, "regex": 0, "erros_llm": 0}
 
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    trava = threading.Lock()
+
     def _extrair(texto: str) -> dict:
         if client is not None:
             try:
                 a = extrair_atributos_llm(texto, client, cache, LLM_MODEL_PADRAO)
-                stats_fonte["llm"] += 1
+                with trava:
+                    stats_fonte["llm"] += 1
                 return a
             except Exception as exc:
-                stats_fonte["erros_llm"] += 1
-                if stats_fonte["erros_llm"] <= 3:
+                with trava:
+                    stats_fonte["erros_llm"] += 1
+                    n_erros = stats_fonte["erros_llm"]
+                if n_erros <= 3:
                     log.warning("[2] LLM falhou (%s) — regex neste item.", str(exc)[:140])
-        stats_fonte["regex"] += 1
+        with trava:
+            stats_fonte["regex"] += 1
         return extrair_atributos_regex(texto)
 
-    log.info("Extraindo atributos de %d consultas e-Fisco...", len(consultas))
-    consultas["atributos"] = [_extrair(t) for t in consultas["item_efisco"]]
+    def _extrair_lote(textos: list[str]) -> list[dict]:
+        """Uma chamada por texto; em paralelo quando há LLM (I/O-bound), na
+        ordem de entrada. O cache em memória é compartilhado entre threads —
+        escrita de dict sob o GIL é segura, e repetir um texto só custa uma
+        chamada a mais."""
+        if client is None or LLM_WORKERS <= 1:
+            return [_extrair(t) for t in textos]
+        with ThreadPoolExecutor(max_workers=LLM_WORKERS) as pool:
+            return list(pool.map(_extrair, textos))
+
+    log.info("Extraindo atributos de %d consultas e-Fisco (%d threads)...",
+             len(consultas), LLM_WORKERS if client is not None else 1)
+    consultas["atributos"] = _extrair_lote(consultas["item_efisco"].tolist())
 
     log.info("Extraindo atributos de %d itens do catálogo CATMAT...", len(catalogo))
+    canons = _extrair_lote(catalogo["item_catmat"].tolist())
     attrs_catalogo = []
-    for texto, parser in zip(catalogo["item_catmat"], catalogo["catmat_atributos"]):
-        canon = _extrair(texto)
+    for canon, parser in zip(canons, catalogo["catmat_atributos"]):
         # O parser do rótulo é autoritativo para tipo_produto; a LLM canoniza
         # as características. Os dois se somam, com a LLM por cima.
         merged = {k: v for k, v in parser.items() if k == "tipo_produto"}
@@ -809,6 +893,55 @@ def fase_2_extracao(estado: dict) -> dict:
         },
     })
     return estado
+
+
+# ---------------------------------------------------------------------------
+# SIMILARIDADE FUNDIDA — compartilhada pelas fases [3] e [5]
+# ---------------------------------------------------------------------------
+
+def _similaridade_fusao(estado: dict) -> np.ndarray:
+    """
+    Matriz consulta x catálogo com a fusão linear léxico-densa da grade
+    (`e5_tfidf_char_lin`): PESOS_FUSAO['e5'] x cosseno E5 + TF-IDF de palavra
+    + TF-IDF de caractere, todos em [0, 1]. Calculada uma vez e guardada no
+    estado; os embeddings E5 vêm do mesmo cache em disco da grade modular
+    (indexado pelo texto), então uma grade já rodada poupa o encode aqui.
+    """
+    if "_sim_fusao" in estado:
+        return estado["_sim_fusao"]
+
+    from . import avaliacao_modular as am
+
+    consultas, catalogo = estado["consultas"], estado["catalogo"]
+    if TEXTO_NEURAL == "rede" and "doc_virtual_expandido" in consultas.columns:
+        col_q, pre_id = "doc_virtual_expandido", "pipeline_rede"
+    else:
+        col_q, pre_id = "efisco_processado", "basico"
+    textos = am.Textos(
+        pre_id=pre_id,
+        queries=consultas[col_q].fillna("").astype(str).tolist(),
+        catalogo=catalogo["catmat_processado"].fillna("").astype(str).tolist(),
+    )
+    ctx = estado.setdefault("_ctx_fusao", {})
+    try:
+        emb_e, emb_c = am._embeddings_e5(textos, ctx)
+        sim_e5 = emb_e @ emb_c.T
+        modelo = MODELO_EMBEDDING
+    except am.ModuloIndisponivel as exc:
+        log.warning("E5 indisponível (%s) — fusão só com TF-IDF.", exc)
+        emb_e = emb_c = None
+        sim_e5 = np.zeros((len(consultas), len(catalogo)), dtype=np.float32)
+        modelo = "tfidf_fallback"
+
+    sim = (PESOS_FUSAO["e5"] * sim_e5
+           + PESOS_FUSAO["tfidf"] * am._matriz_tfidf(textos, ctx)
+           + PESOS_FUSAO["tfidf_char"] * am._matriz_tfidf_char(textos, ctx)).astype(np.float32)
+
+    estado.update({"_sim_fusao": sim, "_sim_e5": sim_e5, "_emb_e": emb_e, "_emb_c": emb_c,
+                   "_modelo_neural": modelo, "_texto_neural": col_q})
+    log.info("[fusão] %s sobre '%s': %d x %d.", " + ".join(f"{p:.2f}x{k}" for k, p in PESOS_FUSAO.items()),
+             col_q, *sim.shape)
+    return sim
 
 
 # ---------------------------------------------------------------------------
@@ -873,28 +1006,13 @@ def fase_3_blocking(estado: dict) -> dict:
     vec_cat = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 4), max_features=20000)
     mat_cat = vec_cat.fit_transform(catalogo["catmat_processado"].fillna(""))
 
-    # --- Estratégia 6: blocking semântico por embedding E5 (cross-PDM) ------
-    # Pré-computado aqui para: (a) elevar o teto do recall, (b) ser reutilizado
-    # pela fase [5] sem segundo encode (economiza ~30 s de CPU).
-    _emb_modelo = _carregar_modelo_embedding()
-    _emb_e_bl: np.ndarray | None = None
-    _emb_c_bl: np.ndarray | None = None
-    if _emb_modelo is not None:
-        log.info("[blocking] Pré-codificando catálogo + consultas para blocking semântico...")
-        textos_c_bl = catalogo["catmat_processado"].fillna("").tolist()
-        textos_e_bl = consultas["doc_virtual_expandido"].fillna("").tolist()
-        enc_c_bl = [f"passage: {t}" for t in textos_c_bl] if _USA_PREFIXO_E5 else textos_c_bl
-        enc_e_bl = [f"query: {t}" for t in textos_e_bl] if _USA_PREFIXO_E5 else textos_e_bl
-        _emb_c_bl = _emb_modelo.encode(enc_c_bl, batch_size=64, convert_to_numpy=True,
-                                        normalize_embeddings=True, show_progress_bar=False)
-        _emb_e_bl = _emb_modelo.encode(enc_e_bl, batch_size=64, convert_to_numpy=True,
-                                        normalize_embeddings=True, show_progress_bar=False)
-        log.info("[blocking] Embeddings prontos: consultas=%d, catálogo=%d",
-                 len(_emb_e_bl), len(_emb_c_bl))
-        # Guarda no estado para fase_5 reutilizar (sem re-encode)
-        estado["_emb_e"] = _emb_e_bl
-        estado["_emb_c"] = _emb_c_bl
-        estado["_emb_modelo"] = _emb_modelo
+    # --- Estratégia 6: blocking semântico cross-PDM pela similaridade FUNDIDA
+    # (E5 + TF-IDF palavra + TF-IDF caractere). Era só o cosseno E5; a grade
+    # mediu a fusão +7,6 pp de R@3 acima dele, e o que ela recupera a mais são
+    # itens que o embedding deixava fora do top-50 — exatamente o teto que o
+    # blocking define. A matriz fica no estado e a fase [5] a reutiliza.
+    log.info("[blocking] Similaridade fundida para blocking semântico...")
+    sim_fusao = _similaridade_fusao(estado)
 
     candidatos: dict[str, list[int]] = {}
     origens: list[str] = []
@@ -943,22 +1061,18 @@ def fase_3_blocking(estado: dict) -> dict:
             if origem == "sem_candidato":
                 origem = "lexical"
 
-        # 6. Blocking semântico cross-PDM (E5 bi-encoder)
+        # 6. Blocking semântico cross-PDM pela similaridade fundida
         # Complementa sempre — captura equivalências que escapam ao PDM idêntico.
-        if _emb_c_bl is not None and _emb_e_bl is not None:
-            q_emb = _emb_e_bl[pos_e]
-            sims_emb = _emb_c_bl @ q_emb
-            top_sem = set(np.argsort(-sims_emb)[:_N_SEM_BLOCKING].tolist())
-            cands.update(top_sem)
-            if cands and origem == "sem_candidato":
-                origem = "embedding"
+        sims_fus = sim_fusao[pos_e]
+        top_sem = set(np.argsort(-sims_fus)[:_N_SEM_BLOCKING].tolist())
+        cands.update(top_sem)
+        if cands and origem == "sem_candidato":
+            origem = "fusao"
 
-        # Teto por consulta: mantém os mais afins lexicalmente
+        # Teto por consulta: mantém os mais afins pela similaridade fundida
         if len(cands) > MAX_CANDIDATOS:
             idxs = np.array(sorted(cands))
-            v = vec_cat.transform([row["efisco_processado"] or row["item_efisco"]])
-            sims = (mat_cat[idxs] @ v.T).toarray().ravel()
-            cands = set(idxs[np.argsort(-sims)[:MAX_CANDIDATOS]].tolist())
+            cands = set(idxs[np.argsort(-sims_fus[idxs])[:MAX_CANDIDATOS]].tolist())
 
         candidatos[cod_e] = sorted(cands)
         origens.append(origem)
@@ -1174,36 +1288,14 @@ def fase_5_matcher_neural(estado: dict) -> dict:
     consultas, catalogo = estado["consultas"], estado["catalogo"]
     candidatos, cod_por_idx = estado["candidatos"], estado["cod_por_idx"]
 
-    textos_e = consultas["doc_virtual_expandido"].fillna("").tolist()
-    textos_c = catalogo["catmat_processado"].fillna("").tolist()
+    # Estágio 1 pela similaridade FUNDIDA (a mesma do blocking). O cosseno E5
+    # puro fica registrado em `score_cosine` para a trilha e para a ablação.
+    sim_fusao = _similaridade_fusao(estado)
+    sim_e5 = estado["_sim_e5"]
+    modelo = estado.get("_modelo_neural", MODELO_EMBEDDING)
 
-    # Reutiliza embeddings pré-computados pela fase [3] (evita re-encode)
-    if "_emb_e" in estado and "_emb_c" in estado:
-        log.info("Reutilizando embeddings E5 pré-computados do blocking (fase [3]).")
-        emb_e = estado["_emb_e"]
-        emb_c = estado["_emb_c"]
-        modelo = estado.get("_emb_modelo")
-    else:
-        modelo = _carregar_modelo_embedding()
-        if modelo is not None:
-            log.info("Codificando %d consultas + %d itens de catálogo...",
-                     len(textos_e), len(textos_c))
-            enc_e = [f"query: {t}" for t in textos_e] if _USA_PREFIXO_E5 else textos_e
-            enc_c = [f"passage: {t}" for t in textos_c] if _USA_PREFIXO_E5 else textos_c
-            emb_e = modelo.encode(enc_e, batch_size=64, convert_to_numpy=True,
-                                  normalize_embeddings=True, show_progress_bar=False)
-            emb_c = modelo.encode(enc_c, batch_size=64, convert_to_numpy=True,
-                                  normalize_embeddings=True, show_progress_bar=False)
-        else:
-            log.info("Usando TF-IDF como fallback do bi-encoder...")
-            vec = TfidfVectorizer(ngram_range=(1, 2), max_features=20000)
-            vec.fit(textos_e + textos_c)
-            emb_e = vec.transform(textos_e).toarray().astype(np.float32)
-            emb_c = vec.transform(textos_c).toarray().astype(np.float32)
-            emb_e /= (np.linalg.norm(emb_e, axis=1, keepdims=True) + 1e-9)
-            emb_c /= (np.linalg.norm(emb_c, axis=1, keepdims=True) + 1e-9)
-
-    log.info("Estágio 1: pontuando blocos e retendo top-%d por consulta...", K_RERANK)
+    log.info("Estágio 1: pontuando blocos pela fusão e retendo top-%d por consulta...",
+             K_RERANK)
 
     linhas = []
     for pos_e, row in consultas.iterrows():
@@ -1212,8 +1304,9 @@ def fase_5_matcher_neural(estado: dict) -> dict:
         if not cands:
             continue
         idxs = np.asarray(cands, dtype=int)
-        sims = emb_c[idxs] @ emb_e[pos_e]
-        ordem = np.argsort(-sims)[:K_RERANK]
+        sims_f = sim_fusao[pos_e, idxs]
+        sims_cos = sim_e5[pos_e, idxs]
+        ordem = np.argsort(-sims_f)[:K_RERANK]
         for rank1, j in enumerate(ordem):
             i_cat = int(idxs[j])
             linhas.append({
@@ -1221,7 +1314,8 @@ def fase_5_matcher_neural(estado: dict) -> dict:
                 "codigo_catmat": cod_por_idx[i_cat],
                 "idx_consulta": pos_e,
                 "idx_catalogo": i_cat,
-                "score_cosine": float(sims[j]),
+                "score_cosine": float(sims_cos[j]),
+                "score_fusao": float(sims_f[j]),
                 "rank_estagio1": rank1,
             })
 
@@ -1230,51 +1324,206 @@ def fase_5_matcher_neural(estado: dict) -> dict:
              len(pares), int(consultas["n_candidatos"].sum()))
 
     # --- Estágio 2: cross-encoder ------------------------------------------
-    ce = _carregar_cross_encoder()
+    # Opcional (--sem-cross): na grade o reranking por cross-encoder mMARCO
+    # derrubou o E5 em todas as linhas do MMH. Fica ligado por fidelidade ao
+    # desenho de dois estágios, e a avaliação reporta a ablação sem ele.
     itens_e = consultas["item_efisco"].fillna("").tolist()
     itens_c = catalogo["item_catmat"].fillna("").tolist()
-
     entradas = [
         (itens_e[r.idx_consulta], itens_c[r.idx_catalogo])
         for r in pares.itertuples()
     ]
 
+    ce = _carregar_cross_encoder() if USAR_CROSS else None
     if ce is not None and entradas:
-        log.info("Estágio 2: cross-encoder em %d pares...", len(entradas))
+        # Cache em disco por par de textos: o cross-encoder custa ~30 min em CPU
+        # neste corpus e o resultado não muda entre execuções.
+        cache_cross = _carregar_cache_extracao(_cache_path("cross_encoder.json"))
+        chaves = [_hash_texto(a + "||" + b) for a, b in entradas]
+        faltam = [k for k in range(len(entradas)) if chaves[k] not in cache_cross]
+        log.info("Estágio 2: cross-encoder em %d pares (%d em cache)...",
+                 len(entradas), len(entradas) - len(faltam))
         t0 = time.time()
-        brutos = ce.predict(entradas, batch_size=64, show_progress_bar=False)
-        scores_cross = (1.0 / (1.0 + np.exp(-np.asarray(brutos, dtype=float)))).tolist()
-        log.info("  -> %.1fs (%.0f pares/s)", time.time() - t0,
-                 len(entradas) / max(time.time() - t0, 1e-6))
-    else:
+        if faltam:
+            brutos = ce.predict([entradas[k] for k in faltam], batch_size=64,
+                                show_progress_bar=False)
+            novos = 1.0 / (1.0 + np.exp(-np.asarray(brutos, dtype=float)))
+            for k, s in zip(faltam, novos):
+                cache_cross[chaves[k]] = float(s)
+            _salvar_cache_extracao(cache_cross, _cache_path("cross_encoder.json"))
+            log.info("  -> %.1fs (%.0f pares/s)", time.time() - t0,
+                     len(faltam) / max(time.time() - t0, 1e-6))
+        scores_cross = [cache_cross[k] for k in chaves]
+        estagio2 = MODELO_CROSS_ENCODER
+    elif USAR_CROSS:
         log.info("Estágio 2: fallback fuzzy em %d pares...", len(entradas))
         scores_cross = [_score_fuzzy(a, b) for a, b in entradas]
+        estagio2 = "fuzzy_fallback"
+    else:
+        log.info("Estágio 2 desligado (--sem-cross): score neural = fusão.")
+        scores_cross = pares["score_fusao"].tolist()
+        estagio2 = "desligado"
 
     pares["score_cross"] = scores_cross
-    pares["score_neural"] = (
-        0.7 * pares["score_cosine"].clip(0, 1) + 0.3 * pares["score_cross"].clip(0, 1)
-    ).clip(0, 1)
+    if USAR_CROSS:
+        pares["score_neural"] = (
+            0.7 * pares["score_fusao"].clip(0, 1) + 0.3 * pares["score_cross"].clip(0, 1)
+        ).clip(0, 1)
+    else:
+        pares["score_neural"] = pares["score_fusao"].clip(0, 1)
 
     print("\n=== [5] MATCHER NEURAL ===")
-    print(f"  Modelo bi-encoder       : "
-          f"{MODELO_EMBEDDING if modelo is not None else 'tfidf_fallback'}")
-    print(f"  Assimetria E5 ativa     : {modelo is not None and _USA_PREFIXO_E5}")
+    print(f"  Estágio 1 (fusão)       : {modelo} + TF-IDF palavra + TF-IDF caractere "
+          f"({', '.join(f'{k} {p:.2f}' for k, p in PESOS_FUSAO.items())}) "
+          f"sobre '{estado.get('_texto_neural', '')}'")
+    print(f"  Estágio 2               : {estagio2}")
     print(f"  Pares pontuados         : {len(pares)}")
-    print(f"  Score cosine médio      : {pares['score_cosine'].mean():.3f}")
+    print(f"  Score cosine E5 médio   : {pares['score_cosine'].mean():.3f}")
+    print(f"  Score fusão médio       : {pares['score_fusao'].mean():.3f}")
     print(f"  Score cross médio       : {pares['score_cross'].mean():.3f}")
     print(f"  Score neural médio      : {pares['score_neural'].mean():.3f}")
 
     estado.update({
         "pares": pares,
-        "emb_consultas": emb_e,
+        "emb_consultas": estado.get("_emb_e"),
         "stats_fase5": {
-            "modelo_embedding": MODELO_EMBEDDING if modelo is not None else "tfidf_fallback",
-            "encoder_assimetrico": bool(modelo is not None and _USA_PREFIXO_E5),
-            "cross_encoder": MODELO_CROSS_ENCODER if ce is not None else "fuzzy_fallback",
+            "modelo_embedding": modelo,
+            "encoder_assimetrico": bool(modelo == MODELO_EMBEDDING and _USA_PREFIXO_E5),
+            "fusao": dict(PESOS_FUSAO),
+            "texto_neural": estado.get("_texto_neural", ""),
+            "cross_encoder": estagio2,
             "n_pares_pontuados": len(pares),
             "score_cosine_medio": float(pares["score_cosine"].mean()),
+            "score_fusao_medio": float(pares["score_fusao"].mean()),
             "score_cross_medio": float(pares["score_cross"].mean()),
             "score_neural_medio": float(pares["score_neural"].mean()),
+        },
+    })
+    return estado
+
+
+# ---------------------------------------------------------------------------
+# FASE [5b] — SINAIS SIMBÓLICOS SOBRE O TOP-K
+# O que a grade modular chamou de pós-processador `combinado_calibrado`: três
+# sinais que o bi-encoder não vê, somados ao score neural com peso pequeno.
+# ---------------------------------------------------------------------------
+
+def fase_5b_sinais_simbolicos(estado: dict) -> dict:
+    """
+    Fase [5b]: medida tipada + cobertura de entidades (IDF) + taxonomia.
+
+    - medidas       : fração das medidas da consulta (valor+unidade convertidos
+                      à base) que o candidato satisfaz — `caracteristicas.py`.
+    - graphrag_idf  : cobertura das entidades da consulta pelo candidato, no KG
+                      offline do GraphRAG, cada entidade pesando o seu IDF; com
+                      LLM, os atributos extraídos na fase [2] entram como
+                      entidades tipadas dos dois lados.
+    - taxonomia     : P(classe CATMAT | classe e-Fisco) estimada nos vínculos
+                      conhecidos em leave-one-out — a MESMA fonte (histórico de
+                      vínculos) que a fase [1] usa para minerar jargão, e por
+                      isso admitida aqui; a consulta avaliada nunca contribui
+                      para a própria estimativa.
+
+    score_neural += PESO_SINAIS x (0,6 medidas + 1,0 graphrag_idf + 0,3 taxonomia)
+    """
+    log.info("=" * 68)
+    log.info("[5b] SINAIS SIMBÓLICOS — medida, GraphRAG-IDF, taxonomia")
+    log.info("=" * 68)
+
+    pares = estado["pares"]
+    pares["score_neural_base"] = pares["score_neural"]
+    for col in ("bonus_medidas", "bonus_graphrag_idf", "bonus_taxonomia",
+                "bonus_ontologia", "score_sinais"):
+        pares[col] = 0.0
+    if not USAR_SINAIS or pares.empty:
+        log.warning("[5b] desligada (--sem-sinais) ou sem pares.")
+        estado["stats_fase5b"] = {"ativa": False}
+        return estado
+
+    from . import caracteristicas
+    from . import graphrag as gr
+    from . import taxonomia as tx
+
+    consultas, catalogo = estado["consultas"], estado["catalogo"]
+    perfil = perfil_ativo()
+
+    # 1. Medidas tipadas do texto CRU (a normalização apaga a polegada).
+    med_q = caracteristicas.indice(consultas["item_efisco"].fillna("").astype(str).tolist(), perfil)
+    med_c = caracteristicas.indice(catalogo["item_catmat"].fillna("").astype(str).tolist(), perfil)
+    r_q, r_c = caracteristicas.resumo(med_q), caracteristicas.resumo(med_c)
+
+    # 2. KG offline + IDF (com os atributos da fase [2], quando existem).
+    kg = gr.construir_kg(consultas, catalogo)
+    m = max(1, len(kg.ents_catalogo))
+    idf = {ent: float(np.log(1.0 + m / len(idxs))) for ent, idxs in kg.indice_invertido.items()}
+
+    def _cobertura(i: int, j: int) -> float:
+        proprias = kg.ents_consulta.get(i, set())
+        relevantes = {e for e in proprias if not e.startswith("PDM::")} or proprias
+        if not relevantes:
+            return 0.0
+        peso = lambda e: (1.0 if e.startswith("TOK::") else 2.0) * idf.get(e, 1.0)
+        total = sum(peso(e) for e in relevantes)
+        comuns = relevantes & kg.ents_catalogo.get(j, set())
+        return sum(peso(e) for e in comuns) / total if total > 0 else 0.0
+
+    # 3. Taxonomia (LOO sobre o histórico de vínculos).
+    al = tx.alinhamento_historico(consultas, catalogo, estado["gold_map"])
+    cobertura_tx = tx.diagnostico_cobertura(al, estado["gold_map"], consultas, catalogo)
+
+    # 4. Dedução ontológica da fase [4], como bônus na escala dos outros sinais.
+    deducoes = estado.get("deducoes", {})
+
+    b_med, b_gr, b_tx, b_ont = [], [], [], []
+    for r in pares.itertuples():
+        i, j = int(r.idx_consulta), int(r.idx_catalogo)
+        b_med.append(caracteristicas.satisfacao(med_q[i], med_c[j]) if med_q[i] else 0.0)
+        b_gr.append(_cobertura(i, j))
+        b_tx.append(al.compatibilidade(i, j))
+        ded = deducoes.get((r.codigo_efisco, r.codigo_catmat), {}).get("deducao", "")
+        b_ont.append(BONUS_DEDUCAO.get(ded, 0.0))
+
+    pares["bonus_medidas"] = b_med
+    pares["bonus_graphrag_idf"] = b_gr
+    pares["bonus_taxonomia"] = b_tx
+    pares["bonus_ontologia"] = b_ont
+    pares["score_sinais"] = (
+        PESOS_REL_SINAIS["medidas"] * pares["bonus_medidas"]
+        + PESOS_REL_SINAIS["graphrag_idf"] * pares["bonus_graphrag_idf"]
+        + PESOS_REL_SINAIS["taxonomia"] * pares["bonus_taxonomia"]
+        + PESOS_REL_SINAIS.get("ontologia", 0.0) * pares["bonus_ontologia"]
+    )
+    # Sem clip: o que importa é a ORDEM dentro de cada consulta, e cortar em 1
+    # achataria justamente os primeiros colocados.
+    pares["score_neural"] = pares["score_neural_base"] + PESO_SINAIS * pares["score_sinais"]
+
+    print("\n=== [5b] SINAIS SIMBÓLICOS ===")
+    print(f"  Consultas com medida    : {r_q['com_medida']} / {r_q['total']}  "
+          f"(catálogo {r_c['com_medida']} / {r_c['total']})")
+    print(f"  KG                      : {kg.G.number_of_nodes()} nós, "
+          f"{len(kg.indice_invertido)} entidades, {len(set(kg.comunidade.values()))} comunidades")
+    print(f"  Taxonomia (LOO)         : correto compatível em "
+          f"{100 * cobertura_tx['fracao_correto_compativel']:.1f}% das consultas; "
+          f"{cobertura_tx['classe_sem_historico_loo']} classes sem histórico")
+    print(f"  Dedução ontológica      : {int((pares['bonus_ontologia'] > 0).sum())} pares com "
+          f"equivalenteA/broadMatch entre os {len(pares)} do top-K")
+    print(f"  Pares com algum sinal   : {int((pares['score_sinais'] > 0).sum())} / {len(pares)}")
+    print(f"  Pesos                   : {PESO_SINAIS} x {PESOS_REL_SINAIS}")
+
+    estado.update({
+        "pares": pares,
+        "stats_fase5b": {
+            "ativa": True,
+            "peso": PESO_SINAIS,
+            "pesos_relativos": dict(PESOS_REL_SINAIS),
+            "medidas": {"consultas": r_q, "catalogo": r_c},
+            "kg": {"n_nos": kg.G.number_of_nodes(), "n_entidades": len(kg.indice_invertido),
+                   "n_comunidades": len(set(kg.comunidade.values()))},
+            "taxonomia": {**al.resumo(), **cobertura_tx,
+                          "fonte": "histórico de vínculos, leave-one-out"},
+            "ontologia": {"pares_com_deducao_positiva": int((pares["bonus_ontologia"] > 0).sum()),
+                          "bonus": dict(BONUS_DEDUCAO)},
+            "pares_com_sinal": int((pares["score_sinais"] > 0).sum()),
         },
     })
     return estado
@@ -1462,8 +1711,12 @@ def _adjudicar_graphrag_llm(par: dict, contexto_local: list, contexto_global: st
     """
     Adjudicacao por LLM com contexto local (KG + vizinhos TF-IDF) e global (comunidade).
     Inclui matches provaveis/parciais — nao so os de alta confianca.
+
+    A chave do cache inclui o contexto global (a resposta do local_search do
+    Microsoft GraphRAG): um veredito dado SEM o indice nao pode ser reaproveitado
+    numa execucao COM ele, senao a segunda execucao nunca consulta o indice.
     """
-    chave = _hash_texto(par["efisco"] + "||" + par["catmat"])
+    chave = _hash_texto(par["efisco"] + "||" + par["catmat"] + "||ctx:" + (contexto_global or "")[:300])
     if chave in cache:
         return cache[chave]
 
@@ -1519,6 +1772,71 @@ def _adjudicar_graphrag_llm(par: dict, contexto_local: list, contexto_global: st
     return veredito
 
 
+def _adjudicar_lista_llm(consulta: str, candidatos: list[dict], contexto_global: str,
+                         client, cache: dict, model: str = LLM_MODEL_PADRAO) -> dict:
+    """
+    Adjudicacao EM LISTA: a LLM ve os K melhores candidatos de uma consulta de
+    uma vez e da uma nota a cada um, comparando-os entre si.
+
+    E a correcao do modo par a par, que perguntava "este par e o mesmo item?"
+    a um par isolado e rebaixava corretos com especificacao incompleta (-2,2 a
+    -4,8 pp de R@3). Em lista a pergunta e relativa -- "qual destes e o item?"
+    -- e ausencia de atributo deixa de contar como conflito. Cada candidato
+    chega com o que o pipeline ja sabe dele: score neural, deducao da
+    ontologia e fracao das medidas da consulta que satisfaz.
+    """
+    codigos = "|".join(c["codigo"] for c in candidatos)
+    chave = _hash_texto("lista||" + consulta + "||" + codigos + "||ctx:" + (contexto_global or "")[:300])
+    if chave in cache:
+        return cache[chave]
+
+    linhas = []
+    for k, c in enumerate(candidatos, start=1):
+        pistas = [f"score neural {c['score_neural']:.2f}"]
+        if c.get("deducao") and c["deducao"] != "incompleto":
+            pistas.append(f"ontologia: {c['deducao']}")
+        if c.get("medidas") is not None:
+            pistas.append(f"medidas da consulta satisfeitas: {c['medidas']:.0%}")
+        linhas.append(f"  {k}. [{' | '.join(pistas)}] {str(c['texto'])[:220]}")
+
+    ctx_global = (f"\nContexto do grafo de conhecimento sobre a consulta: {contexto_global[:600]}"
+                  if contexto_global else "")
+    prompt = (
+        f"{perfil_ativo().papel('auditor')} "
+        "Abaixo, um item do e-Fisco e os candidatos do CATMAT que o sistema considera "
+        "mais provaveis. De a CADA candidato uma nota de 0 a 1 para 'e o mesmo material "
+        "(mesmo produto, especificacao compativel)'. Compare os candidatos ENTRE SI: o "
+        "melhor recebe a maior nota; candidatos de outro produto recebem nota abaixo de "
+        "0,3. Especificacao AUSENTE num candidato nao e conflito -- so divergencia "
+        "explicita e. Nao invente atributos.\n\n"
+        f"ITEM E-FISCO:\n  {str(consulta)[:300]}\n\n"
+        f"CANDIDATOS CATMAT:\n" + "\n".join(linhas) + f"{ctx_global}\n\n"
+        'Responda APENAS JSON: {"notas": [<nota do 1>, <nota do 2>, ...], '
+        '"melhor": <numero do melhor>, "justificativa": "<uma frase>"}'
+    )
+    resp = client.chat.completions.create(
+        model=model, max_tokens=220,
+        response_format={"type": "json_object"},
+        messages=[{"role": "user", "content": prompt}],
+    )
+    dados = json.loads(resp.choices[0].message.content or "{}")
+    brutas = dados.get("notas") or []
+    notas = []
+    for k in range(len(candidatos)):
+        try:
+            v = float(brutas[k])
+        except (IndexError, TypeError, ValueError):
+            v = 0.5   # sem nota: neutro, nao pune
+        notas.append(max(0.0, min(1.0, v)))
+    veredito = {
+        "notas": notas,
+        "melhor": dados.get("melhor"),
+        "justificativa": str(dados.get("justificativa", "")).strip(),
+    }
+    cache[chave] = veredito
+    return veredito
+
+
 def fase_6_graphrag(estado: dict) -> dict:
     """
     Fase [6]: GraphRAG via Microsoft GraphRAG (github.com/microsoft/graphrag).
@@ -1555,17 +1873,33 @@ def fase_6_graphrag(estado: dict) -> dict:
     from pathlib import Path
 
     client, motivo = _construir_cliente_openai()
-    if client is None:
-        log.warning("[6] LLM indisponivel (%s) — GraphRAG requer API key.", motivo)
-
     api_key = os.environ.get("OPENAI_API_KEY", "")
-    try:
-        gr_config, gr_artefatos = gr.inicializar(consultas, catalogo, api_key)
-        gr_ok = all(v is not None for v in gr_artefatos.values())
-    except Exception as exc:
-        log.warning("[6] GraphRAG inicialização falhou: %s — usando fallback TF-IDF.", exc)
+    adjudica = client is not None and LLM_MAX_ADJUDICACOES > 0 and ADJUDICACAO != "nenhuma"
+    if not adjudica:
+        # Sem LLM (ou teto zero, ou --adjudicacao nenhuma) não há adjudicação,
+        # e indexar o corpus no Microsoft GraphRAG (horas e milhares de
+        # chamadas) não teria quem o lesse.
+        log.warning("[6] sem adjudicacao LLM (%s) — votacao por vizinhos TF-IDF.",
+                    f"LLM indisponivel: {motivo}" if client is None
+                    else ("teto de adjudicacoes = 0" if LLM_MAX_ADJUDICACOES <= 0
+                          else "--adjudicacao nenhuma"))
         gr_ok = False
         gr_config = gr_artefatos = None
+    elif not USAR_CONTEXTO_MS:
+        # O índice oficial só é construído/consultado com --contexto-ms: medido
+        # como adjudicador de pares, piorou o ranking (−4,8 pp) e custou ~2 h de
+        # indexação mais duas chamadas por consulta. Fica como opção.
+        log.info("[6] Índice Microsoft GraphRAG não usado (--contexto-ms liga).")
+        gr_ok = False
+        gr_config = gr_artefatos = None
+    else:
+        try:
+            gr_config, gr_artefatos = gr.inicializar(consultas, catalogo, api_key)
+            gr_ok = all(v is not None for v in gr_artefatos.values())
+        except Exception as exc:
+            log.warning("[6] GraphRAG inicialização falhou: %s — usando fallback TF-IDF.", exc)
+            gr_ok = False
+            gr_config = gr_artefatos = None
 
     # ------------------------------------------------------------------ #
     # 4. Estruturas de consulta                                          #
@@ -1607,62 +1941,113 @@ def fase_6_graphrag(estado: dict) -> dict:
     # 5. Adjudicacao na zona cinzenta                                    #
     # ------------------------------------------------------------------ #
     cache_adj = _carregar_cache_extracao(cache_graphrag_path()) if client else {}
-    zona_baixo, zona_alto = ZONA_CINZENTA
+
+    # Zona cinzenta pela MARGEM entre o 1º e o 2º candidato (score neural):
+    # consulta com margem abaixo de LIMIAR_MARGEM_ALTA é incerta — é a mesma
+    # definição das faixas de confiança da fase [8], validada contra o gabarito.
+    # O limiar absoluto ZONA_CINZENTA do MMH não separa nada na escala fundida.
+    ordenado = pares.sort_values(["codigo_efisco", "score_neural"], ascending=[True, False])
+    grupos = ordenado.groupby("codigo_efisco")["score_neural"]
+    primeiro = grupos.first()
+    segundo = grupos.apply(lambda s: s.iloc[1] if len(s) > 1 else s.iloc[0])
+    margem = (primeiro - segundo).to_dict()
     alvos = [r for r in melhor.itertuples()
-             if zona_baixo <= r.score_neural < zona_alto]
-    log.info("[6] Zona cinzenta: %d consultas a adjudicar.", len(alvos))
+             if margem.get(r.codigo_efisco, 0.0) < LIMIAR_MARGEM_ALTA]
+    n_zona = len(alvos)
+    alvos.sort(key=lambda r: margem.get(r.codigo_efisco, 0.0))   # as mais incertas primeiro
+    if adjudica and len(alvos) > LLM_MAX_ADJUDICACOES:
+        log.info("[6] Zona cinzenta (margem < %.2f): %d consultas; teto %d — adjudicando as "
+                 "de menor margem (máxima adjudicada: %.3f).", LIMIAR_MARGEM_ALTA, n_zona,
+                 LLM_MAX_ADJUDICACOES,
+                 margem.get(alvos[LLM_MAX_ADJUDICACOES - 1].codigo_efisco, 0.0))
+    else:
+        log.info("[6] Zona cinzenta (margem < %.2f): %d consultas.", LIMIAR_MARGEM_ALTA, n_zona)
 
-    ajustes: dict = {}
+    # Medidas da consulta satisfeitas por candidato (pista para a LLM em lista).
+    bonus_med = pares["bonus_medidas"] if "bonus_medidas" in pares.columns else None
+    top_k_por_consulta: dict[str, pd.DataFrame] = {}
+    if adjudica and ADJUDICACAO == "lista":
+        for cod, grupo in ordenado.groupby("codigo_efisco"):
+            top_k_por_consulta[cod] = grupo.head(K_LISTA)
+
+    ajustes: dict = {}          # idx do par -> (score_graphrag, justificativa)
     n_llm = n_voto = n_erro = 0
+    a_adjudicar = alvos[:LLM_MAX_ADJUDICACOES] if adjudica else []
+    restantes = alvos[len(a_adjudicar):] if adjudica else alvos
 
-    for r in alvos:
-        i_cons = r.idx_consulta
-        texto_efisco = itens_e[i_cons]
-
-        # Busca local via Microsoft GraphRAG
-        ctx_gr = ""
-        if gr_ok:
-            ctx_gr = gr.busca_local(gr_config, gr_artefatos, texto_efisco[:300])
-
-        # Fallback: vizinhos TF-IDF top-3
+    def _contexto_tfidf(i_cons: int) -> list:
         vizinhos_idx = sorted(
             G_sim[i_cons], key=lambda v: -G_sim[i_cons][v].get("peso", 0)
         )[:5] if i_cons in G_sim else []
-        contexto_tfidf = []
+        ctx = []
         for v in vizinhos_idx:
             for cand in top3_por_consulta.get(v, []):
                 j = cand["idx_catalogo"]
-                contexto_tfidf.append({
-                    "tipo": "vizinho_tfidf",
-                    "efisco": itens_e[v],
-                    "catmat": itens_c[j] if j < len(itens_c) else "",
-                    "score": cand["score"],
-                })
+                ctx.append({"tipo": "vizinho_tfidf", "efisco": itens_e[v],
+                            "catmat": itens_c[j] if j < len(itens_c) else "",
+                            "score": cand["score"]})
+        return ctx
 
-        veredito = None
-        if client is not None and n_llm < LLM_MAX_ADJUDICACOES:
+    def _adjudicar_uma(r) -> tuple:
+        """Devolve (lista de (idx_par, score, justificativa), erro) para uma consulta."""
+        i_cons = r.idx_consulta
+        texto_efisco = itens_e[i_cons]
+        ctx_gr = gr.busca_local(gr_config, gr_artefatos, texto_efisco[:300]) if gr_ok else ""
+        try:
+            if ADJUDICACAO == "lista":
+                grupo = top_k_por_consulta.get(r.codigo_efisco)
+                if grupo is None or grupo.empty:
+                    return [], None
+                cands = []
+                for rr in grupo.itertuples():
+                    cands.append({
+                        "codigo": rr.codigo_catmat,
+                        "texto": itens_c[rr.idx_catalogo] if rr.idx_catalogo < len(itens_c) else "",
+                        "score_neural": float(rr.score_neural),
+                        "deducao": deducoes.get((rr.codigo_efisco, rr.codigo_catmat), {}).get("deducao", ""),
+                        "medidas": float(bonus_med.loc[rr.Index]) if bonus_med is not None else None,
+                    })
+                ver = _adjudicar_lista_llm(texto_efisco, cands, ctx_gr, client, cache_adj, LLM_MODEL_PADRAO)
+                saida = []
+                for rr, nota in zip(grupo.itertuples(), ver["notas"]):
+                    misto = (1.0 - PESO_ADJUDICACAO_LISTA) * float(rr.score_neural) + PESO_ADJUDICACAO_LISTA * nota
+                    saida.append((rr.Index, misto, ver["justificativa"]))
+                return saida, None
             par_dict = {
                 "efisco": texto_efisco,
                 "catmat": itens_c[r.idx_catalogo] if r.idx_catalogo < len(itens_c) else "",
                 "score_neural": float(r.score_neural),
-                "deducao": deducoes.get(
-                    (r.codigo_efisco, r.codigo_catmat), {}).get("deducao", ""),
+                "deducao": deducoes.get((r.codigo_efisco, r.codigo_catmat), {}).get("deducao", ""),
             }
-            try:
-                veredito = _adjudicar_graphrag_llm(
-                    par_dict, contexto_tfidf, ctx_gr,
-                    client, cache_adj, LLM_MODEL_PADRAO
-                )
-                n_llm += 1
-            except Exception as exc:
+            ver = _adjudicar_graphrag_llm(par_dict, _contexto_tfidf(i_cons), ctx_gr,
+                                         client, cache_adj, LLM_MODEL_PADRAO)
+            return [(r.Index, ver["score"], ver["justificativa"])], None
+        except Exception as exc:
+            return [], exc
+
+    if a_adjudicar:
+        from concurrent.futures import ThreadPoolExecutor
+        log.info("[6] Adjudicando %d consultas em modo '%s' (%d threads)...",
+                 len(a_adjudicar), ADJUDICACAO, LLM_WORKERS)
+        with ThreadPoolExecutor(max_workers=LLM_WORKERS) as pool:
+            resultados = list(pool.map(_adjudicar_uma, a_adjudicar))
+        for r, (saida, erro) in zip(a_adjudicar, resultados):
+            if erro is not None:
                 n_erro += 1
                 if n_erro <= 3:
-                    log.warning("[6] Adjudicacao falhou: %s", str(exc)[:140])
+                    log.warning("[6] Adjudicacao falhou: %s", str(erro)[:140])
+                restantes.append(r)
+                continue
+            if saida:
+                n_llm += 1
+                for idx, score, justif in saida:
+                    ajustes[idx] = (score, justif)
 
-        if veredito is not None:
-            ajustes[r.Index] = (veredito["score"], veredito["justificativa"])
-        elif contexto_tfidf:
-            s_viz = float(np.mean([c["score"] for c in contexto_tfidf]))
+    # Sem LLM (ou além do teto): votação pelos vizinhos TF-IDF, como antes.
+    for r in restantes:
+        ctx = _contexto_tfidf(r.idx_consulta)
+        if ctx:
+            s_viz = float(np.mean([c["score"] for c in ctx]))
             ajustes[r.Index] = (min(1.0, 0.6 * float(r.score_neural) + 0.4 * s_viz), "")
             n_voto += 1
 
@@ -1673,12 +2058,12 @@ def fase_6_graphrag(estado: dict) -> dict:
     if client is not None:
         _salvar_cache_extracao(cache_adj, cache_graphrag_path())
 
-    print("\n=== [6] GRAPHRAG (Microsoft GraphRAG) ===")
-    print(f"  Indice GraphRAG         : {'OK' if gr_ok else 'fallback TF-IDF'}")
+    print("\n=== [6] GRAPHRAG (adjudicação) ===")
+    print(f"  Indice Microsoft        : {'OK' if gr_ok else 'não usado'}")
     print(f"  Arestas grafo TF-IDF    : {G_sim.number_of_edges()}")
-    print(f"  Consultas na zona cinza : {len(alvos)}")
-    print(f"  Adjudicacao             : LLM {n_llm} | votacao {n_voto}"
-          + (f" | erros {n_erro}" if n_erro else ""))
+    print(f"  Zona cinzenta (margem)  : {n_zona} consultas")
+    print(f"  Adjudicacao             : modo {ADJUDICACAO if adjudica else 'nenhuma'} | "
+          f"LLM {n_llm} | votacao {n_voto}" + (f" | erros {n_erro}" if n_erro else ""))
     if ajustes:
         deltas = [abs(pares.at[i, "score_graphrag"] - pares.at[i, "score_neural"])
                   for i in ajustes]
@@ -1690,7 +2075,11 @@ def fase_6_graphrag(estado: dict) -> dict:
         "stats_fase6": {
             "graphrag_microsoft": gr_ok,
             "n_arestas_sim": G_sim.number_of_edges(),
-            "n_zona_cinzenta": len(alvos),
+            "n_zona_cinzenta": n_zona,
+            "criterio_zona": f"margem top1-top2 < {LIMIAR_MARGEM_ALTA}, as menores primeiro",
+            "modo_adjudicacao": ADJUDICACAO if adjudica else "nenhuma",
+            "k_lista": K_LISTA,
+            "peso_adjudicacao_lista": PESO_ADJUDICACAO_LISTA,
             "adjudicacao_llm": n_llm,
             "adjudicacao_votacao": n_voto,
             "adjudicacao_erros": n_erro,
@@ -1730,14 +2119,17 @@ def fase_8_confianca(estado: dict) -> dict:
     pares["deducao_ontologia"] = deducao_col
     pares["explicacao_ontologia"] = explic_col
 
+    # Sem clip em 1: o score neural com os sinais da [5b] pode passar de 1 nos
+    # primeiros colocados, e cortar ali achataria justamente o topo do ranking.
     pares["score_final"] = (
         PESOS_SCORE_FINAL["ontologia"] * pares["score_ontologia"]
         + PESOS_SCORE_FINAL["neural"]  * pares["score_neural"]
         + PESOS_SCORE_FINAL["graphrag"] * pares["score_graphrag"]
-    ).clip(0, 1).round(4)
+    ).clip(lower=0).round(4)
 
-    # O veto derruba o par independentemente do que o neural achou.
-    pares.loc[pares["deducao_ontologia"] == "veto", "score_final"] *= 0.25
+    # Veto: penalidade opcional (FATOR_VETO = 1,0 desliga; ver constante).
+    if FATOR_VETO != 1.0:
+        pares.loc[pares["deducao_ontologia"] == "veto", "score_final"] *= FATOR_VETO
 
     # Ranqueamento dentro de cada consulta — é isto que faltava antes.
     pares["rank"] = (
@@ -1746,24 +2138,43 @@ def fase_8_confianca(estado: dict) -> dict:
     )
     pares.sort_values(["codigo_efisco", "rank"], inplace=True)
 
-    def _faixa(s):
-        return "Alta" if s >= LIMIAR_ALTA else ("Média" if s >= LIMIAR_MEDIA else "Baixa")
+    # Confiança pela MARGEM entre o 1º e o 2º candidato da consulta: é a
+    # propriedade da decisão que o gabarito confirmou como preditiva (ver
+    # LIMIAR_MARGEM_*). A faixa é da consulta e vale para todos os seus pares.
+    grupos = pares.groupby("codigo_efisco")["score_final"]
+    primeiro = grupos.first()
+    segundo = grupos.apply(lambda s: s.iloc[1] if len(s) > 1 else 0.0)
+    margem = (primeiro - segundo)
+    pares["margem"] = pares["codigo_efisco"].map(margem).round(4)
 
-    pares["confianca"] = pares["score_final"].apply(_faixa)
+    def _faixa(m):
+        return ("Alta" if m >= LIMIAR_MARGEM_ALTA
+                else ("Média" if m >= LIMIAR_MARGEM_MEDIA else "Baixa"))
+
+    pares["confianca"] = pares["margem"].apply(_faixa)
 
     # Trilha de explicação (§4.1 "Governança")
     trilhas = []
     for r in pares.itertuples():
         partes = [
-            f"score_final={r.score_final:.3f} -> {r.confianca}  (rank {r.rank})",
-            f"  Ontologia ({r.score_ontologia:.3f} x {PESOS_SCORE_FINAL['ontologia']}): "
-            f"{r.deducao_ontologia}",
+            f"score_final={r.score_final:.3f} -> {r.confianca} "
+            f"(rank {r.rank}; margem 1o-2o da consulta {r.margem:.3f})",
+            f"  Ontologia ({r.score_ontologia:.3f} x {PESOS_SCORE_FINAL['ontologia']}; "
+            f"bonus [5b] {getattr(r, 'bonus_ontologia', 0.0):.1f}): {r.deducao_ontologia}",
         ]
         partes += [f"    {l}" for l in list(r.explicacao_ontologia)[:3]]
         partes.append(
             f"  Neural    ({r.score_neural:.3f} x {PESOS_SCORE_FINAL['neural']}): "
-            f"cosine={r.score_cosine:.3f}, cross={r.score_cross:.3f}"
+            f"fusao={getattr(r, 'score_fusao', float('nan')):.3f}, "
+            f"cosine_e5={r.score_cosine:.3f}, cross={r.score_cross:.3f}"
         )
+        if getattr(r, "score_sinais", 0.0):
+            partes.append(
+                f"    sinais (+{PESO_SINAIS} x {r.score_sinais:.3f}): "
+                f"medidas={getattr(r, 'bonus_medidas', 0.0):.2f}, "
+                f"graphrag_idf={getattr(r, 'bonus_graphrag_idf', 0.0):.2f}, "
+                f"taxonomia={getattr(r, 'bonus_taxonomia', 0.0):.2f}"
+            )
         partes.append(
             f"  GraphRAG  ({r.score_graphrag:.3f} x {PESOS_SCORE_FINAL['graphrag']})"
             + (f": {r.graphrag_justificativa}" if r.graphrag_justificativa else "")
@@ -1818,45 +2229,96 @@ def avaliacao_retrieval(estado: dict) -> dict:
         estado["stats_avaliacao"] = {}
         return estado
 
-    ranked: dict[str, list[str]] = defaultdict(list)
-    for r in pares.sort_values("rank").itertuples():
-        ranked[r.codigo_efisco].append(r.codigo_catmat)
-
     ks = [1, 3, 5, 10, K_AVALIACAO]
     ks = sorted(set(k for k in ks if k <= max(K_RERANK, 1)))
 
-    acertos = {k: 0 for k in ks}
-    rr_total = 0.0
-    n_aval = 0
+    def _metricas(ranked: dict[str, list[str]]) -> dict:
+        acertos = {k: 0 for k in ks}
+        rr_total = 0.0
+        n_aval = 0
+        for cod_e, alvos in gold_map.items():
+            if cod_e not in ranked or not alvos:
+                continue
+            n_aval += 1
+            pos = next((i for i, c in enumerate(ranked[cod_e]) if c in alvos), None)
+            if pos is not None:
+                rr_total += 1.0 / (pos + 1)
+                for k in ks:
+                    if pos < k:
+                        acertos[k] += 1
+        return {"n_avaliados": n_aval, "mrr": rr_total / max(n_aval, 1),
+                **{f"recall_at_{k}": acertos[k] / max(n_aval, 1) for k in ks}}
 
-    for cod_e, alvos in gold_map.items():
-        if cod_e not in ranked or not alvos:
-            continue
-        n_aval += 1
-        lista = ranked[cod_e]
-        pos = next((i for i, c in enumerate(lista) if c in alvos), None)
-        if pos is not None:
-            rr_total += 1.0 / (pos + 1)
-            for k in ks:
-                if pos < k:
-                    acertos[k] += 1
+    def _ranking_por(coluna: str) -> dict[str, list[str]]:
+        ranked: dict[str, list[str]] = defaultdict(list)
+        ordenado = pares.sort_values(["codigo_efisco", coluna], ascending=[True, False])
+        for r in ordenado.itertuples():
+            ranked[r.codigo_efisco].append(r.codigo_catmat)
+        return ranked
 
+    # O ranking oficial é o da fase [8] (score_final).
+    ranked_final: dict[str, list[str]] = defaultdict(list)
+    for r in pares.sort_values("rank").itertuples():
+        ranked_final[r.codigo_efisco].append(r.codigo_catmat)
     resultado = {
-        "n_avaliados": n_aval,
+        **_metricas(ranked_final),
         "recall_blocking": estado["stats_fase3"]["recall_blocking"],
-        "mrr": rr_total / max(n_aval, 1),
-        **{f"recall_at_{k}": acertos[k] / max(n_aval, 1) for k in ks},
     }
     resultado["precisao_at_1"] = resultado.get("recall_at_1", 0.0)
 
+    # Ablação: o mesmo top-K reordenado por cada camada isolada. É o que diz
+    # quanto cada fase acrescentou — ou tirou — sem rodar o pipeline de novo.
+    # A fase [6] só entra no score final (0,8 neural + 0,2 adjudicação): a coluna
+    # `score_graphrag` isolada mistura pares adjudicados e não adjudicados numa
+    # mesma consulta e não é um ranking coerente — por isso não há linha dela.
+    camadas = [
+        ("cosseno E5 (só o bi-encoder)", "score_cosine"),
+        ("fusão E5+TF-IDF (estágio 1)", "score_fusao"),
+        ("+ cross-encoder (estágio 2)", "score_neural_base"),
+        ("+ sinais simbólicos (fase 5b)", "score_neural"),
+        ("+ adjudicação (fase 6) = score final", "score_final"),
+    ]
+    ablacoes = {}
+    for rotulo, coluna in camadas:
+        if coluna in pares.columns:
+            ablacoes[rotulo] = _metricas(_ranking_por(coluna))
+
     print("\n=== [*] AVALIAÇÃO DE RETRIEVAL ===")
-    print(f"  Consultas avaliadas     : {n_aval}")
+    print(f"  Consultas avaliadas     : {resultado['n_avaliados']}")
     print(f"  Recall do blocking (teto): {100*resultado['recall_blocking']:.1f}%")
     print(f"  MRR                     : {resultado['mrr']:.4f}")
     for k in ks:
         print(f"  Recall@{k:<2d}               : {100*resultado[f'recall_at_{k}']:.1f}%")
     print(f"  Precisão@1              : {100*resultado['precisao_at_1']:.1f}%")
+    print("\n  Ablação (mesmo top-K, reordenado por cada camada):")
+    print(f"    {'camada':<36}{'MRR':>8}{'R@1':>8}{'R@3':>8}{'R@10':>8}")
+    for rotulo, m in ablacoes.items():
+        print(f"    {rotulo:<36}{m['mrr']:>8.4f}{100*m['recall_at_1']:>7.1f}%"
+              f"{100*m['recall_at_3']:>7.1f}%{100*m.get('recall_at_10', 0):>7.1f}%")
 
+    # As faixas de confiança valem o que a sua precisão medida vale: P@1 e R@3
+    # do gabarito dentro de cada faixa. É o que permite dizer ao curador quanto
+    # do que sai como "Alta" está certo.
+    por_faixa = {}
+    if "confianca" in pares.columns:
+        top1 = pares[pares["rank"] == 1]
+        for faixa in ("Alta", "Média", "Baixa"):
+            sub = top1[top1["confianca"] == faixa]
+            if sub.empty:
+                continue
+            cods = set(sub["codigo_efisco"])
+            m = _metricas({c: l for c, l in ranked_final.items() if c in cods})
+            por_faixa[faixa] = {"n": int(len(sub)), "fracao": round(len(sub) / len(top1), 4),
+                                "precisao_at_1": round(m["recall_at_1"], 4),
+                                "recall_at_3": round(m["recall_at_3"], 4)}
+        print("\n  Confiança (margem 1o-2o) contra o gabarito:")
+        print(f"    {'faixa':<8}{'n':>6}{'%':>8}{'P@1':>8}{'R@3':>8}")
+        for faixa, m in por_faixa.items():
+            print(f"    {faixa:<8}{m['n']:>6}{100*m['fracao']:>7.1f}%"
+                  f"{100*m['precisao_at_1']:>7.1f}%{100*m['recall_at_3']:>7.1f}%")
+
+    resultado["ablacoes"] = ablacoes
+    resultado["por_confianca"] = por_faixa
     estado["stats_avaliacao"] = resultado
     return estado
 
@@ -1891,8 +2353,9 @@ def fase_7_grafo_unificado(estado: dict) -> dict:
     for r in pares.itertuples():
         no_e, no_c = f"eFisco_{r.codigo_efisco}", f"CATMAT_{r.codigo_catmat}"
 
-        # Só afirma equivalência quando a decisão a sustenta.
-        if r.rank == 1 and r.score_final >= LIMIAR_MEDIA and r.deducao_ontologia != "veto":
+        # Só afirma equivalência quando a decisão a sustenta: top-1 com margem
+        # que não seja "Baixa" e sem veto da ontologia.
+        if r.rank == 1 and r.confianca != "Baixa" and r.deducao_ontologia != "veto":
             relacao, n_equiv = "equivalenteA", n_equiv + 1
         else:
             relacao, n_cand = "candidatoA", n_cand + 1
@@ -2184,8 +2647,9 @@ def exportar_resultados(estado: dict) -> None:
 
     cols = [
         "codigo_efisco", "codigo_catmat", "rank", "score_final", "confianca",
-        "score_ontologia", "deducao_ontologia", "score_neural",
-        "score_cosine", "score_cross", "score_graphrag",
+        "score_ontologia", "deducao_ontologia", "score_neural", "score_neural_base",
+        "score_fusao", "score_cosine", "score_cross", "score_sinais",
+        "bonus_medidas", "bonus_graphrag_idf", "bonus_taxonomia", "score_graphrag",
         "graphrag_justificativa", "trilha",
     ]
     cols = [c for c in cols if c in pares.columns]
@@ -2199,6 +2663,7 @@ def exportar_resultados(estado: dict) -> None:
         "fase3": estado.get("stats_fase3", {}),
         "fase4": estado.get("stats_fase4", {}),
         "fase5": estado.get("stats_fase5", {}),
+        "fase5b": estado.get("stats_fase5b", {}),
         "fase6": estado.get("stats_fase6", {}),
         "fase7": estado.get("stats_fase7", {}),
         "fase8": estado.get("stats_fase8", {}),
@@ -2212,9 +2677,23 @@ def exportar_resultados(estado: dict) -> None:
             "modelo_llm": LLM_MODEL_PADRAO,
             "k_rerank": K_RERANK,
             "pesos_score_final": PESOS_SCORE_FINAL,
+            "fator_veto": FATOR_VETO,
+            "pesos_fusao": PESOS_FUSAO,
+            "texto_neural": TEXTO_NEURAL,
+            "peso_sinais": PESO_SINAIS,
+            "pesos_rel_sinais": PESOS_REL_SINAIS,
             "usar_llm": USAR_LLM,
             "usar_rede_semantica": USAR_REDE,
+            "usar_cross_encoder": USAR_CROSS,
+            "usar_sinais": USAR_SINAIS,
+            "llm_max_adjudicacoes": LLM_MAX_ADJUDICACOES,
+            "adjudicacao": ADJUDICACAO,
+            "k_lista": K_LISTA,
+            "peso_adjudicacao_lista": PESO_ADJUDICACAO_LISTA,
+            "contexto_ms": USAR_CONTEXTO_MS,
+            "limiares_margem": {"alta": LIMIAR_MARGEM_ALTA, "media": LIMIAR_MARGEM_MEDIA},
         },
+        "perfil": perfil_ativo().resumo(),
     }
 
     def _limpar(o):
@@ -2288,7 +2767,9 @@ def executar_pipeline_completo() -> dict:
     print(f"  PIPELINE NEURO-SIMBÓLICO — CATMAT <-> e-Fisco [{ctx.dataset.nome}]")
     print(f"  Domínio: {ctx.perfil.nome} | Rede semântica + OWL + Neural + GraphRAG")
     print(f"  LLM: {LLM_MODEL_PADRAO if USAR_LLM else 'DESLIGADA'} | "
-          f"Rede semântica: {'ativa' if USAR_REDE else 'ABLAÇÃO'}")
+          f"Rede semântica: {'ativa' if USAR_REDE else 'ABLAÇÃO'} | "
+          f"Cross-encoder: {'ativo' if USAR_CROSS else 'desligado'} | "
+          f"Sinais [5b]: {'ativos' if USAR_SINAIS else 'desligados'}")
     print("=" * 68)
 
     t_inicio = time.time()
@@ -2306,6 +2787,8 @@ def executar_pipeline_completo() -> dict:
         estado = fase_4_ontologia(estado)
     with CRONO.medir("fase_5_matcher_neural"):
         estado = fase_5_matcher_neural(estado)
+    with CRONO.medir("fase_5b_sinais_simbolicos"):
+        estado = fase_5b_sinais_simbolicos(estado)
     with CRONO.medir("fase_6_graphrag"):
         estado = fase_6_graphrag(estado)
     with CRONO.medir("fase_8_confianca"):
@@ -2339,7 +2822,9 @@ def executar_pipeline_completo() -> dict:
 
 def _cli() -> None:
     """CLI do pipeline. Escolhe o dataset ANTES de qualquer leitura de dados."""
-    global USAR_LLM, USAR_REDE, LLM_MODEL_PADRAO
+    global USAR_LLM, USAR_REDE, USAR_CROSS, USAR_SINAIS, LLM_MODEL_PADRAO
+    global TEXTO_NEURAL, LLM_MAX_ADJUDICACOES, K_RERANK, FATOR_VETO
+    global ADJUDICACAO, K_LISTA, USAR_CONTEXTO_MS, PESO_ADJUDICACAO_LISTA
 
     import argparse
 
@@ -2357,8 +2842,47 @@ def _cli() -> None:
                     help="execução offline: regex do perfil no lugar da LLM")
     ap.add_argument("--sem-rede", action="store_true",
                     help="ablação: desliga a rede semântica da fase [1]")
+    ap.add_argument("--cross", action="store_true",
+                    help="liga o cross-encoder (estágio 2 da fase [5]); desligado por padrão "
+                         "porque piora o ranking e custa ~30 min de CPU")
+    ap.add_argument("--sem-cross", action="store_true",
+                    help="(padrão) mantém o cross-encoder desligado; existe para compatibilidade")
+    ap.add_argument("--sem-sinais", action="store_true",
+                    help="ablação: desliga a fase [5b] (medida, GraphRAG-IDF, taxonomia)")
+    ap.add_argument("--neural-texto", choices=("basico", "rede"), default=TEXTO_NEURAL,
+                    help="texto da consulta na fusão: normalização básica (padrão) ou o "
+                         "documento virtual expandido da rede semântica")
+    ap.add_argument("--k-rerank", type=int, default=K_RERANK,
+                    help=f"candidatos por consulta que seguem para as fases [5]-[8] "
+                         f"(padrão: {K_RERANK})")
+    ap.add_argument("--max-adjudicacoes", type=int, default=LLM_MAX_ADJUDICACOES,
+                    help=f"teto de adjudicações LLM na fase [6] (padrão: {LLM_MAX_ADJUDICACOES})")
+    ap.add_argument("--adjudicacao", choices=("lista", "par", "nenhuma"), default=ADJUDICACAO,
+                    help="fase [6]: a LLM pontua os K melhores candidatos de uma vez (lista, "
+                         "padrão), julga só o top-1 (par) ou não entra (nenhuma)")
+    ap.add_argument("--k-lista", type=int, default=K_LISTA,
+                    help=f"candidatos mostrados à LLM no modo lista (padrão: {K_LISTA})")
+    ap.add_argument("--peso-adjudicacao", type=float, default=PESO_ADJUDICACAO_LISTA,
+                    help="peso da nota da LLM no score_graphrag dos candidatos adjudicados em "
+                         f"lista (padrão: {PESO_ADJUDICACAO_LISTA})")
+    ap.add_argument("--contexto-ms", action="store_true",
+                    help="constrói/consulta o índice Microsoft GraphRAG e passa o local_search "
+                         "como contexto à adjudicação (caro: ~2 h de indexação)")
+    ap.add_argument("--peso-rel", default="",
+                    help="pesos relativos dos sinais da fase [5b], ex. "
+                         "'medidas=0.6,graphrag_idf=1,taxonomia=0.3,ontologia=0.6'")
     ap.add_argument("--model", default="",
                     help="modelo da LLM; isola a saída em resultados/<dataset>/<modelo>/")
+    ap.add_argument("--saida", default="",
+                    help="subpasta de resultados/<dataset>/ para esta execução (não "
+                         "sobrescreve as saídas publicadas do dataset)")
+    ap.add_argument("--peso-ontologia", type=float,
+                    help=f"peso da ontologia no score final (padrão "
+                         f"{PESOS_SCORE_FINAL['ontologia']}); neural e graphrag são "
+                         "rebalanceados na proporção original")
+    ap.add_argument("--fator-veto", type=float,
+                    help=f"multiplicador do score final de um par vetado (padrão {FATOR_VETO}; "
+                         "1.0 desliga o veto)")
     args = ap.parse_args()
 
     if args.smoke:
@@ -2370,12 +2894,41 @@ def _cli() -> None:
         USAR_LLM = False
     if args.sem_rede:
         USAR_REDE = False
+    if args.cross:
+        USAR_CROSS = True
+    if args.sem_cross:
+        USAR_CROSS = False
+    if args.sem_sinais:
+        USAR_SINAIS = False
+    TEXTO_NEURAL = args.neural_texto
+    K_RERANK = args.k_rerank
+    LLM_MAX_ADJUDICACOES = args.max_adjudicacoes
+    ADJUDICACAO = args.adjudicacao
+    K_LISTA = args.k_lista
+    PESO_ADJUDICACAO_LISTA = args.peso_adjudicacao
+    USAR_CONTEXTO_MS = args.contexto_ms
+    for par in filter(None, (p.strip() for p in args.peso_rel.split(","))):
+        nome, _, valor = par.partition("=")
+        PESOS_REL_SINAIS[nome.strip()] = float(valor)
     if args.model:
         LLM_MODEL_PADRAO = args.model
         # Saída isolada por modelo, para comparar LLMs lado a lado sem que uma
         # execução sobrescreva a anterior.
         ctx.dataset.sub_resultados = args.model.replace("/", "-").replace(":", "-")
         print(f"[--model] LLM: {LLM_MODEL_PADRAO} | saída: {ctx.dataset.dir_resultados}")
+    if args.saida:
+        ctx.dataset.sub_resultados = re.sub(r"[^A-Za-z0-9_\-]+", "-", args.saida)
+        print(f"[--saida] saída: {ctx.dataset.dir_resultados}")
+    if args.peso_ontologia is not None:
+        resto = 1.0 - args.peso_ontologia
+        base = PESOS_SCORE_FINAL["neural"] + PESOS_SCORE_FINAL["graphrag"]
+        PESOS_SCORE_FINAL["ontologia"] = args.peso_ontologia
+        PESOS_SCORE_FINAL["neural"] = round(resto * PESOS_SCORE_FINAL["neural"] / base, 4)
+        PESOS_SCORE_FINAL["graphrag"] = round(resto * PESOS_SCORE_FINAL["graphrag"] / base, 4)
+        print(f"[--peso-ontologia] pesos do score final: {PESOS_SCORE_FINAL}")
+    if args.fator_veto is not None:
+        FATOR_VETO = args.fator_veto
+        print(f"[--fator-veto] {FATOR_VETO}")
 
     executar_pipeline_completo()
 

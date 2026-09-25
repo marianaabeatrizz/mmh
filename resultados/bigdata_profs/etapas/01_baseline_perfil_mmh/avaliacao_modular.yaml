@@ -1,0 +1,569 @@
+INFO:
+  DATA: '2026-09-22 23:00:36'
+  ARQUITETURA: pré-proc x processador x pós-proc (pipeline.jpg)
+  METRICA_MATRIZ: recall_at_3
+  TOP_K_CANDIDATOS: 20
+  DADOS:
+    DATASET: bigdata_profs
+    GROUND_TRUTH: 20260916_ground_truth_bigdata_profs_completo_test_ouro.csv
+    N_CONSULTAS: 1375
+    N_CATALOGO: 1297
+    BLOCKING: nenhum — catálogo inteiro por consulta
+  PERFIL:
+    NOME: mmh
+    DESCRICAO: compras públicas hospitalares (Brasil / Material Médico Hospitalar)
+    TAMANHOS:
+      boilerplate: 13
+      stopwords: 41
+      abreviacoes: 20
+      variantes: 7
+      sinonimos: 5
+      hierarquia: 11
+      unidades: 17
+      familias: 14
+      atributos: 11
+      atributos_definidores: 15
+      regras_extracao: 9
+    PROVENIENCIA:
+      boilerplate: curado
+      stopwords: curado
+      sinonimos_regex: curado
+      abreviacoes: curado
+      variantes: curado
+      sinonimos: curado
+      hierarquia: curado
+      unidades: curado
+      atributos: curado
+      atributos_definidores: curado
+      extracao: curado
+      entidade_stopwords: curado
+      familias_extra: curado
+      medidas: curado
+    LACUNAS: []
+  MODULOS:
+    PRE:
+    - ID: nada
+      NOME: Pré-proc 1 (Nada)
+      DESCRICAO: texto cru, sem transformação
+    - ID: basico
+      NOME: Normalização básica
+      DESCRICAO: boilerplate jurídico + sinônimos + stopwords
+    PROC:
+    - ID: tfidf
+      NOME: TF-IDF (cosseno)
+      DESCRICAO: 1-2 gramas, 20k features
+    - ID: e5
+      NOME: E5 bi-encoder
+      DESCRICAO: intfloat/multilingual-e5-base
+    POS:
+    - ID: nada
+      NOME: Pós-proc 1 (Nada)
+      DESCRICAO: ranking do processador, sem reordenação
+    - ID: unidades
+      NOME: Equivalência de unidades
+      DESCRICAO: valores + unidades de medida (peso 0.25)
+    - ID: pdm
+      NOME: Coerência de PDM
+      DESCRICAO: família do catálogo vs. consulta (peso 0.25)
+    - ID: graphrag
+      NOME: GraphRAG (reranking por KG)
+      DESCRICAO: cobertura de entidades da consulta (peso 0.25)
+    - ID: unidades_graphrag
+      NOME: Unidades + GraphRAG
+      DESCRICAO: os dois sinais com peso igual (peso 0.25)
+    - ID: medidas
+      NOME: Medida tipada (com conversão)
+      DESCRICAO: valor+unidade convertidos à base da categoria, ancorado na consulta (aditivo, peso 0.05)
+    - ID: medidas_graphrag
+      NOME: Medida tipada + GraphRAG
+      DESCRICAO: medida convertida + cobertura de entidades do KG (a melhor combinação medida na grade)
+META_PRE:
+  nada:
+    transformacao: nenhuma
+  basico:
+    transformacao: boilerplate + sinônimos + stopwords
+MATRIZ:
+  nada:
+    tfidf: 0.6269
+    e5: 0.7404
+  basico:
+    tfidf: 0.7265
+    e5: 0.7425
+RANKING:
+- POSICAO: 1
+  COMBINACAO: basico + e5 + medidas_graphrag
+  PRE: basico
+  PROC: e5
+  POS: medidas_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6928
+    recall_at_1: 0.5847
+    recall_at_3: 0.7775
+    recall_at_5: 0.8371
+    recall_at_10: 0.8822
+    precisao_at_1: 0.5847
+  TEMPO_S:
+    pre: 1.46
+    proc: 392.5
+    pos: 0.15
+- POSICAO: 2
+  COMBINACAO: nada + e5 + medidas_graphrag
+  PRE: nada
+  PROC: e5
+  POS: medidas_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.7022
+    recall_at_1: 0.6007
+    recall_at_3: 0.768
+    recall_at_5: 0.8393
+    recall_at_10: 0.8953
+    precisao_at_1: 0.6007
+  TEMPO_S:
+    pre: 0.04
+    proc: 657.65
+    pos: 0.15
+- POSICAO: 3
+  COMBINACAO: basico + e5 + unidades_graphrag
+  PRE: basico
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6614
+    recall_at_1: 0.544
+    recall_at_3: 0.7549
+    recall_at_5: 0.8204
+    recall_at_10: 0.8764
+    precisao_at_1: 0.544
+  TEMPO_S:
+    pre: 1.46
+    proc: 392.5
+    pos: 0.16
+- POSICAO: 4
+  COMBINACAO: nada + e5 + unidades_graphrag
+  PRE: nada
+  PROC: e5
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6804
+    recall_at_1: 0.5702
+    recall_at_3: 0.7542
+    recall_at_5: 0.8269
+    recall_at_10: 0.8887
+    precisao_at_1: 0.5702
+  TEMPO_S:
+    pre: 0.04
+    proc: 657.65
+    pos: 0.21
+- POSICAO: 5
+  COMBINACAO: basico + tfidf + unidades_graphrag
+  PRE: basico
+  PROC: tfidf
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6686
+    recall_at_1: 0.5556
+    recall_at_3: 0.7491
+    recall_at_5: 0.816
+    recall_at_10: 0.8836
+    precisao_at_1: 0.5556
+  TEMPO_S:
+    pre: 1.46
+    proc: 1.0
+    pos: 0.22
+- POSICAO: 6
+  COMBINACAO: basico + tfidf + medidas_graphrag
+  PRE: basico
+  PROC: tfidf
+  POS: medidas_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6713
+    recall_at_1: 0.5593
+    recall_at_3: 0.7491
+    recall_at_5: 0.8189
+    recall_at_10: 0.8836
+    precisao_at_1: 0.5593
+  TEMPO_S:
+    pre: 1.46
+    proc: 1.0
+    pos: 0.15
+- POSICAO: 7
+  COMBINACAO: basico + e5 + medidas
+  PRE: basico
+  PROC: e5
+  POS: medidas
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6615
+    recall_at_1: 0.5462
+    recall_at_3: 0.7476
+    recall_at_5: 0.8138
+    recall_at_10: 0.8742
+    precisao_at_1: 0.5462
+  TEMPO_S:
+    pre: 1.46
+    proc: 392.5
+    pos: 0.09
+- POSICAO: 8
+  COMBINACAO: nada + e5 + unidades
+  PRE: nada
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6697
+    recall_at_1: 0.5556
+    recall_at_3: 0.7447
+    recall_at_5: 0.816
+    recall_at_10: 0.8836
+    precisao_at_1: 0.5556
+  TEMPO_S:
+    pre: 0.04
+    proc: 657.65
+    pos: 0.12
+- POSICAO: 9
+  COMBINACAO: basico + e5 + nada
+  PRE: basico
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6689
+    recall_at_1: 0.5622
+    recall_at_3: 0.7425
+    recall_at_5: 0.8058
+    recall_at_10: 0.8691
+    precisao_at_1: 0.5622
+  TEMPO_S:
+    pre: 1.46
+    proc: 392.5
+    pos: 0.01
+- POSICAO: 10
+  COMBINACAO: nada + e5 + medidas
+  PRE: nada
+  PROC: e5
+  POS: medidas
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6715
+    recall_at_1: 0.5615
+    recall_at_3: 0.7411
+    recall_at_5: 0.8211
+    recall_at_10: 0.8851
+    precisao_at_1: 0.5615
+  TEMPO_S:
+    pre: 0.04
+    proc: 657.65
+    pos: 0.08
+- POSICAO: 11
+  COMBINACAO: nada + e5 + nada
+  PRE: nada
+  PROC: e5
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6748
+    recall_at_1: 0.5687
+    recall_at_3: 0.7404
+    recall_at_5: 0.8116
+    recall_at_10: 0.8815
+    precisao_at_1: 0.5687
+  TEMPO_S:
+    pre: 0.04
+    proc: 657.65
+    pos: 0.01
+- POSICAO: 12
+  COMBINACAO: basico + e5 + unidades
+  PRE: basico
+  PROC: e5
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.648
+    recall_at_1: 0.5273
+    recall_at_3: 0.7375
+    recall_at_5: 0.8051
+    recall_at_10: 0.8727
+    precisao_at_1: 0.5273
+  TEMPO_S:
+    pre: 1.46
+    proc: 392.5
+    pos: 0.11
+- POSICAO: 13
+  COMBINACAO: basico + tfidf + medidas
+  PRE: basico
+  PROC: tfidf
+  POS: medidas
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6696
+    recall_at_1: 0.5615
+    recall_at_3: 0.7367
+    recall_at_5: 0.8102
+    recall_at_10: 0.88
+    precisao_at_1: 0.5615
+  TEMPO_S:
+    pre: 1.46
+    proc: 1.0
+    pos: 0.06
+- POSICAO: 14
+  COMBINACAO: basico + tfidf + graphrag
+  PRE: basico
+  PROC: tfidf
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6641
+    recall_at_1: 0.5571
+    recall_at_3: 0.7353
+    recall_at_5: 0.8051
+    recall_at_10: 0.8793
+    precisao_at_1: 0.5571
+  TEMPO_S:
+    pre: 1.46
+    proc: 1.0
+    pos: 0.1
+- POSICAO: 15
+  COMBINACAO: basico + tfidf + nada
+  PRE: basico
+  PROC: tfidf
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6506
+    recall_at_1: 0.5353
+    recall_at_3: 0.7265
+    recall_at_5: 0.8087
+    recall_at_10: 0.8756
+    precisao_at_1: 0.5353
+  TEMPO_S:
+    pre: 1.46
+    proc: 1.0
+    pos: 0.0
+- POSICAO: 16
+  COMBINACAO: basico + tfidf + unidades
+  PRE: basico
+  PROC: tfidf
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6435
+    recall_at_1: 0.5251
+    recall_at_3: 0.7236
+    recall_at_5: 0.8058
+    recall_at_10: 0.8778
+    precisao_at_1: 0.5251
+  TEMPO_S:
+    pre: 1.46
+    proc: 1.0
+    pos: 0.09
+- POSICAO: 17
+  COMBINACAO: basico + e5 + graphrag
+  PRE: basico
+  PROC: e5
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6314
+    recall_at_1: 0.5098
+    recall_at_3: 0.7156
+    recall_at_5: 0.7964
+    recall_at_10: 0.8684
+    precisao_at_1: 0.5098
+  TEMPO_S:
+    pre: 1.46
+    proc: 392.5
+    pos: 0.18
+- POSICAO: 18
+  COMBINACAO: nada + e5 + graphrag
+  PRE: nada
+  PROC: e5
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6338
+    recall_at_1: 0.5105
+    recall_at_3: 0.7084
+    recall_at_5: 0.7884
+    recall_at_10: 0.8771
+    precisao_at_1: 0.5105
+  TEMPO_S:
+    pre: 0.04
+    proc: 657.65
+    pos: 0.13
+- POSICAO: 19
+  COMBINACAO: basico + tfidf + pdm
+  PRE: basico
+  PROC: tfidf
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.6141
+    recall_at_1: 0.4865
+    recall_at_3: 0.6916
+    recall_at_5: 0.7789
+    recall_at_10: 0.8742
+    precisao_at_1: 0.4865
+  TEMPO_S:
+    pre: 1.46
+    proc: 1.0
+    pos: 0.31
+- POSICAO: 20
+  COMBINACAO: basico + e5 + pdm
+  PRE: basico
+  PROC: e5
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5976
+    recall_at_1: 0.4727
+    recall_at_3: 0.6764
+    recall_at_5: 0.7615
+    recall_at_10: 0.8509
+    precisao_at_1: 0.4727
+  TEMPO_S:
+    pre: 1.46
+    proc: 392.5
+    pos: 0.19
+- POSICAO: 21
+  COMBINACAO: nada + e5 + pdm
+  PRE: nada
+  PROC: e5
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5949
+    recall_at_1: 0.4676
+    recall_at_3: 0.6735
+    recall_at_5: 0.7549
+    recall_at_10: 0.8538
+    precisao_at_1: 0.4676
+  TEMPO_S:
+    pre: 0.04
+    proc: 657.65
+    pos: 0.29
+- POSICAO: 22
+  COMBINACAO: nada + tfidf + unidades_graphrag
+  PRE: nada
+  PROC: tfidf
+  POS: unidades_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5895
+    recall_at_1: 0.4778
+    recall_at_3: 0.6662
+    recall_at_5: 0.7287
+    recall_at_10: 0.808
+    precisao_at_1: 0.4778
+  TEMPO_S:
+    pre: 0.04
+    proc: 1.3
+    pos: 0.25
+- POSICAO: 23
+  COMBINACAO: nada + tfidf + graphrag
+  PRE: nada
+  PROC: tfidf
+  POS: graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5797
+    recall_at_1: 0.4676
+    recall_at_3: 0.6553
+    recall_at_5: 0.7338
+    recall_at_10: 0.8015
+    precisao_at_1: 0.4676
+  TEMPO_S:
+    pre: 0.04
+    proc: 1.3
+    pos: 7.0
+- POSICAO: 24
+  COMBINACAO: nada + tfidf + medidas_graphrag
+  PRE: nada
+  PROC: tfidf
+  POS: medidas_graphrag
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5765
+    recall_at_1: 0.4596
+    recall_at_3: 0.6502
+    recall_at_5: 0.7273
+    recall_at_10: 0.8058
+    precisao_at_1: 0.4596
+  TEMPO_S:
+    pre: 0.04
+    proc: 1.3
+    pos: 0.17
+- POSICAO: 25
+  COMBINACAO: nada + tfidf + medidas
+  PRE: nada
+  PROC: tfidf
+  POS: medidas
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5743
+    recall_at_1: 0.4604
+    recall_at_3: 0.6407
+    recall_at_5: 0.7193
+    recall_at_10: 0.7985
+    precisao_at_1: 0.4604
+  TEMPO_S:
+    pre: 0.04
+    proc: 1.3
+    pos: 4.14
+- POSICAO: 26
+  COMBINACAO: nada + tfidf + unidades
+  PRE: nada
+  PROC: tfidf
+  POS: unidades
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5611
+    recall_at_1: 0.4422
+    recall_at_3: 0.6364
+    recall_at_5: 0.7055
+    recall_at_10: 0.7898
+    precisao_at_1: 0.4422
+  TEMPO_S:
+    pre: 0.04
+    proc: 1.3
+    pos: 0.12
+- POSICAO: 27
+  COMBINACAO: nada + tfidf + nada
+  PRE: nada
+  PROC: tfidf
+  POS: nada
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5544
+    recall_at_1: 0.4371
+    recall_at_3: 0.6269
+    recall_at_5: 0.7011
+    recall_at_10: 0.7876
+    precisao_at_1: 0.4371
+  TEMPO_S:
+    pre: 0.04
+    proc: 1.3
+    pos: 0.0
+- POSICAO: 28
+  COMBINACAO: nada + tfidf + pdm
+  PRE: nada
+  PROC: tfidf
+  POS: pdm
+  METRICAS:
+    n_avaliados: 1375
+    mrr: 0.5508
+    recall_at_1: 0.4305
+    recall_at_3: 0.6255
+    recall_at_5: 0.7091
+    recall_at_10: 0.8015
+    precisao_at_1: 0.4305
+  TEMPO_S:
+    pre: 0.04
+    proc: 1.3
+    pos: 0.25
+SEM_VALOR: []

@@ -18,11 +18,20 @@ etapa vira um módulo trocável e todas as combinações são medidas lado a lad
 Não há blocking: cada consulta é pontuada contra o catálogo CATMAT inteiro, de
 modo que o teto é 100% e as células são comparáveis entre si.
 
-O GraphRAG entra em dois eixos, sobre o mesmo KG (`graphrag`):
+O GraphRAG entra em três eixos, sobre o mesmo KG (`graphrag`):
   - PRÉ-PROCESSADOR (`graphrag`, `graphrag_leve`): expande a consulta com
     entidades vizinhas e o rótulo da comunidade antes da similaridade.
-  - PÓS-PROCESSADOR (`graphrag`, `unidades_graphrag`): reordena o top-K pela
-    cobertura das entidades da consulta pelo candidato.
+  - PROCESSADOR (`e5_kg`, `e5_tfidf_kg_cand`, ...): a busca local do KG vira um
+    ranking completo, fundido ao E5 antes do corte.
+  - PÓS-PROCESSADOR (`graphrag`, `graphrag_idf`, `medidas_graphrag_idf`, ...):
+    reordena o top-K pela cobertura das entidades da consulta pelo candidato,
+    com peso fixo ou ponderada pelo IDF da entidade.
+
+Os processadores híbridos (`e5_tfidf_lin`, `e5_tfidf_char_lin`, ...) fundem o
+cosseno E5 com TF-IDF de palavra e de caractere; a taxonomia dos dois catálogos
+(`taxonomia.py`) entra como pós (`taxonomia`, `combinado_calibrado`) ou como
+fonte da fusão (`e5_taxonomia`). O que cada um rendeu está em RESULTADOS.md
+(mmh) e docs/RESULTADOS-BIGDATA-PROFS.md (bigdata_profs).
 
 Uso:
     python -m catalogo_match.avaliacao_modular                       # grade completa
@@ -33,6 +42,12 @@ Uso:
     python -m catalogo_match.avaliacao_modular --graphrag-ms         # índice Microsoft
     python -m catalogo_match.avaliacao_modular --dataset mmh_opme    # outro corpus
     python -m catalogo_match.avaliacao_modular --perfil base         # sem léxico curado
+    python -m catalogo_match.avaliacao_modular --dataset bigdata_profs \\
+        --proc e5_tfidf_char_lin --pos combinado_calibrado           # a melhor cadeia
+    python -m catalogo_match.avaliacao_modular --peso-rel taxonomia=0.3 --peso-fusao tfidf=0.3
+
+Ferramentas irmãs: `catalogo_match.varredura` (varre parâmetros de uma
+combinação) e `catalogo_match.diagnostico` (onde o R@3 se perde).
 """
 
 import argparse
@@ -62,7 +77,10 @@ import yaml
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import normalize as _normalize_linhas
 
-sys.path.insert(0, str(Path(__file__).parent))
+# (Um `sys.path.insert(0, <esta pasta>)` que havia aqui foi removido: com a
+# pasta do pacote no sys.path, `import graphrag` passava a resolver para o
+# NOSSO catalogo_match/graphrag.py em vez do pacote da Microsoft, e a fase [6]
+# do pipeline quebrava com "attempted relative import with no known parent".)
 from . import caracteristicas
 from .config import contexto, perfil_ativo
 from .preprocessamento import (
@@ -187,8 +205,13 @@ def carregar_corpus(arquivo: str = "",
     df.fillna("", inplace=True)
     ctx.completar_com_dados(df)
 
+    # Colunas opcionais de taxonomia e proveniência: quando o CSV as traz, os
+    # módulos de taxonomia e o diagnóstico as usam; quando não, seguem sem elas.
+    extras_cat = [c for c in ("grupo_catmat",) if c in df.columns]
+    extras_q = [c for c in ("grupo_efisco", "origem", "situacao") if c in df.columns]
+
     catalogo = (
-        df[["codigo_catmat", "item_catmat", "classe_catmat"]]
+        df[["codigo_catmat", "item_catmat", "classe_catmat", *extras_cat]]
         .drop_duplicates(subset="codigo_catmat")
         .reset_index(drop=True)
     )
@@ -199,7 +222,7 @@ def carregar_corpus(arquivo: str = "",
     )
 
     consultas = (
-        df[["codigo_efisco", "item_efisco", "classe_efisco"]]
+        df[["codigo_efisco", "item_efisco", "classe_efisco", *extras_q]]
         .drop_duplicates(subset="codigo_efisco")
         .reset_index(drop=True)
     )
@@ -350,13 +373,21 @@ def _top_k(matriz: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
     return np.take_along_axis(scores, ordem, axis=1), np.take_along_axis(idx, ordem, axis=1)
 
 
+def _matriz_tfidf(textos: Textos, ctx: dict) -> np.ndarray:
+    """Cosseno TF-IDF (1-2 gramas) consulta x catálogo, matriz cheia, memorizada."""
+    chave = f"tfidf::{textos.pre_id}"
+    if chave not in ctx:
+        vec = TfidfVectorizer(ngram_range=(1, 2), max_features=20000, sublinear_tf=True)
+        vec.fit(textos.queries + textos.catalogo)
+        Q = _normalize_linhas(vec.transform(textos.queries))
+        C = _normalize_linhas(vec.transform(textos.catalogo))
+        ctx[chave] = (Q @ C.T).toarray().astype(np.float32)
+    return ctx[chave]
+
+
 def _proc_tfidf(textos: Textos, top_k: int, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
     """Similaridade de cosseno sobre TF-IDF de 1-2 gramas."""
-    vec = TfidfVectorizer(ngram_range=(1, 2), max_features=20000, sublinear_tf=True)
-    vec.fit(textos.queries + textos.catalogo)
-    Q = _normalize_linhas(vec.transform(textos.queries))
-    C = _normalize_linhas(vec.transform(textos.catalogo))
-    return _top_k((Q @ C.T).toarray().astype(np.float32), top_k)
+    return _top_k(_matriz_tfidf(textos, ctx), top_k)
 
 
 def _proc_fuzzy(textos: Textos, top_k: int, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -416,10 +447,197 @@ def _embeddings_e5(textos: Textos, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
     return emb
 
 
+def _matriz_e5(textos: Textos, ctx: dict) -> np.ndarray:
+    """Cosseno E5 consulta x catálogo, matriz cheia."""
+    emb_q, emb_c = _embeddings_e5(textos, ctx)
+    return emb_q @ emb_c.T
+
+
 def _proc_e5(textos: Textos, top_k: int, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
     """Bi-encoder assimétrico multilingual-e5-base (query: / passage:)."""
-    emb_q, emb_c = _embeddings_e5(textos, ctx)
-    return _top_k(emb_q @ emb_c.T, top_k)
+    return _top_k(_matriz_e5(textos, ctx), top_k)
+
+
+# ---- Recuperação híbrida: fusão de rankings ------------------------------------
+# Os pós-processadores só reordenam o top-K do processador; o que o E5 deixou
+# na 30ª posição está perdido para eles. A fusão ataca o TETO: junta rankings
+# de fontes com erros diferentes (denso, léxico, grafo de entidades, taxonomia)
+# ANTES do corte, para que o item certo entre no top-K por qualquer uma delas.
+
+
+def _kg_de(ctx: dict):
+    """KG do GraphRAG offline, construído uma vez por grade e reaproveitado."""
+    from . import graphrag as gr
+
+    kg = ctx.get("_kg_graphrag")
+    if kg is None:
+        corpus = ctx["_corpus"]
+        kg = gr.construir_kg(corpus.consultas, corpus.catalogo)
+        ctx["_kg_graphrag"] = kg
+    return kg
+
+
+def _idf_entidades(kg, ctx: dict) -> dict[str, float]:
+    """
+    IDF de cada entidade do KG, pela sua frequência documental no catálogo.
+
+    Um token que aparece em 400 itens (DESCARTAVEL) não diz qual deles é o
+    certo; um que aparece em 3 (ORTOFTALALDEIDO) quase decide sozinho. O peso
+    fixo 1,0/2,0 do pós-processador `graphrag` original ignorava isso.
+    """
+    if "_idf_kg" not in ctx:
+        m = max(1, len(kg.ents_catalogo))
+        ctx["_idf_kg"] = {ent: float(np.log(1.0 + m / len(idxs)))
+                          for ent, idxs in kg.indice_invertido.items()}
+    return ctx["_idf_kg"]
+
+
+def _matriz_kg(textos: Textos, ctx: dict) -> np.ndarray:
+    """
+    Busca local do GraphRAG como RANKING COMPLETO: soma do IDF das entidades
+    compartilhadas entre consulta e item, normalizada pelo IDF total da
+    consulta. É o que a `_busca_local` do pré-processador faz para achar
+    vizinhos, generalizado ao catálogo inteiro e ponderado por raridade.
+    """
+    chave = "kg::matriz"
+    if chave in ctx:
+        return ctx[chave]
+    kg = _kg_de(ctx)
+    idf = _idf_entidades(kg, ctx)
+    teto = perfil_ativo().max_itens_por_entidade
+    n, m = len(kg.ents_consulta), len(kg.ents_catalogo)
+    matriz = np.zeros((n, m), dtype=np.float32)
+    for i, ents in kg.ents_consulta.items():
+        relevantes = [e for e in ents if not e.startswith("PDM::")] or list(ents)
+        total = sum(idf.get(e, 0.0) for e in relevantes)
+        if total <= 0:
+            continue
+        for ent in relevantes:
+            idxs = kg.indice_invertido.get(ent)
+            if not idxs or len(idxs) > teto:
+                continue
+            matriz[i, idxs] += idf[ent]
+        matriz[i] /= total
+    ctx[chave] = matriz
+    return matriz
+
+
+def _matriz_taxonomia(ctx: dict) -> np.ndarray:
+    """Compatibilidade taxonômica (LOO) consulta x catálogo, matriz cheia."""
+    if "_taxonomia_matriz" not in ctx:
+        from . import taxonomia as tx
+
+        corpus = ctx["_corpus"]
+        al = ctx.get("_taxonomia_hist")
+        if al is None:
+            al = tx.alinhamento_historico(corpus.consultas, corpus.catalogo, corpus.gold)
+            # Botões do sinal, ajustáveis pela CLI (--taxonomia-peso-grupo,
+            # --taxonomia-min-obs) para a varredura sem editar código.
+            if "taxonomia_peso_grupo" in ctx:
+                al.peso_grupo = float(ctx["taxonomia_peso_grupo"])
+            if "taxonomia_min_obs" in ctx:
+                al.min_obs = int(ctx["taxonomia_min_obs"])
+            ctx["_taxonomia_hist"] = al
+            ctx["_taxonomia_resumo"] = {
+                **al.resumo(),
+                **tx.diagnostico_cobertura(al, corpus.gold, corpus.consultas, corpus.catalogo),
+            }
+            log.info("[taxonomia] correto com compatibilidade > 0 (LOO): %.1f%% das consultas; "
+                     "classe sem histórico: %d",
+                     100 * ctx["_taxonomia_resumo"]["fracao_correto_compativel"],
+                     ctx["_taxonomia_resumo"]["classe_sem_historico_loo"])
+        ctx["_taxonomia_matriz"] = tx.matriz_compatibilidade(al)
+    return ctx["_taxonomia_matriz"]
+
+
+def _ranks(matriz: np.ndarray) -> np.ndarray:
+    """Posição (0 = melhor) de cada item em cada linha."""
+    ordem = np.argsort(-matriz, axis=1, kind="stable")
+    ranks = np.empty_like(ordem)
+    linhas = np.arange(matriz.shape[0])[:, None]
+    ranks[linhas, ordem] = np.arange(matriz.shape[1])[None, :]
+    return ranks
+
+
+RRF_K = 60   # constante clássica do Reciprocal Rank Fusion (Cormack et al., 2009)
+
+
+def _fusao_rrf(matrizes: list[np.ndarray], pesos: list[float]) -> np.ndarray:
+    """Σ peso / (RRF_K + posição): só a ORDEM de cada fonte importa, não a escala."""
+    total = np.zeros_like(matrizes[0], dtype=np.float32)
+    for mat, peso in zip(matrizes, pesos):
+        total += peso / (RRF_K + _ranks(mat).astype(np.float32))
+    return total
+
+
+def _matriz_tfidf_char(textos: Textos, ctx: dict) -> np.ndarray:
+    """
+    Cosseno TF-IDF de n-gramas de CARACTERES (3-5, dentro da palavra).
+
+    Complementa o de palavras: casa QUICKLE com QUINCKE, TRANPARENTE com
+    TRANSPARENTE e "ANTIMICROB." com ANTIMICROBIANO sem precisar de léxico.
+    É a mesma rede de segurança lexical do blocking da fase [3].
+    """
+    chave = f"tfidf_char::{textos.pre_id}"
+    if chave not in ctx:
+        vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), max_features=60000,
+                              sublinear_tf=True)
+        vec.fit(textos.queries + textos.catalogo)
+        Q = _normalize_linhas(vec.transform(textos.queries))
+        C = _normalize_linhas(vec.transform(textos.catalogo))
+        ctx[chave] = (Q @ C.T).toarray().astype(np.float32)
+    return ctx[chave]
+
+
+_FONTES = {
+    "e5":         lambda textos, ctx: _matriz_e5(textos, ctx),
+    "tfidf":      lambda textos, ctx: _matriz_tfidf(textos, ctx),
+    "tfidf_char": lambda textos, ctx: _matriz_tfidf_char(textos, ctx),
+    "kg":         lambda textos, ctx: _matriz_kg(textos, ctx),
+    "taxonomia":  lambda textos, ctx: _matriz_taxonomia(ctx),
+}
+
+
+def _proc_fusao(fontes: tuple[str, ...], modo: str = "rrf",
+                pesos: tuple[float, ...] | None = None,
+                escores: str = "") -> Callable:
+    """
+    Processador híbrido: combina os rankings de várias fontes antes do corte.
+
+    `rrf`    — Reciprocal Rank Fusion, robusto a escalas incomparáveis.
+    `linear` — soma ponderada dos scores; exige fontes na mesma escala (os
+               cossenos E5 e TF-IDF estão ambos em [0,1]; a taxonomia também).
+
+    `escores` — quando dado (p. ex. "e5"), a fusão escolhe QUEM entra no top-K,
+    mas o score devolvido é o dessa fonte. Separa os dois papéis: a fusão
+    alarga o conjunto de candidatos (teto), o E5 continua a ordená-los e os
+    pós-processadores continuam a receber cosseno, na escala para a qual os
+    seus pesos foram calibrados. Sem isso, o score RRF (~1/60 por posição)
+    faz um bônus aditivo de 0,05 engolir o ranking inteiro — foi o que
+    derrubou `e5_tfidf + medidas_graphrag` para 0,735 contra 0,772 do E5 puro.
+    """
+    pesos = pesos or tuple(1.0 for _ in fontes)
+
+    def aplicar(textos: Textos, top_k: int, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
+        matrizes = [_FONTES[f](textos, ctx) for f in fontes]
+        # Peso de cada fonte ajustável por execução (CLI: --peso-fusao
+        # tfidf=0.3,kg=0.1; varredura: --param peso_fusao_tfidf=0.1,0.2,...).
+        efetivos = [ctx.get(f"peso_fusao_{f}", p) for f, p in zip(fontes, pesos)]
+        if modo == "rrf":
+            combinada = _fusao_rrf(matrizes, efetivos)
+        else:
+            combinada = sum(p * m for p, m in zip(efetivos, matrizes)).astype(np.float32)
+        scores, idx = _top_k(combinada, top_k)
+        if escores:
+            base = _FONTES[escores](textos, ctx)
+            scores = np.take_along_axis(base, idx, axis=1).astype(np.float32)
+            ordem = np.argsort(-scores, axis=1, kind="stable")
+            scores = np.take_along_axis(scores, ordem, axis=1)
+            idx = np.take_along_axis(idx, ordem, axis=1)
+        return scores, idx
+
+    aplicar.__name__ = f"_proc_fusao_{'_'.join(fontes)}_{modo}{'_' + escores if escores else ''}"
+    return aplicar
 
 
 def _proc_e5_cross(textos: Textos, top_k: int, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
@@ -485,6 +703,54 @@ PROCESSADORES: dict[str, Modulo] = {
     "e5_cross": Modulo("e5_cross", "E5 + cross-encoder", _proc_e5_cross,
                        f"{MODELO_EMBEDDING} + {MODELO_CROSS_ENCODER} "
                        f"(reranking do top-{K_CROSS_RERANK})"),
+    # --- híbridos: fusão de rankings antes do corte (ataca o teto do top-K) ---
+    "e5_tfidf":     Modulo("e5_tfidf", "E5 + TF-IDF (RRF)",
+                           _proc_fusao(("e5", "tfidf")),
+                           "fusão recíproca de ranks: denso + léxico"),
+    "e5_kg":        Modulo("e5_kg", "E5 + GraphRAG local search (RRF)",
+                           _proc_fusao(("e5", "kg")),
+                           "denso + ranking por entidades do KG ponderadas por IDF"),
+    "e5_tfidf_kg":  Modulo("e5_tfidf_kg", "E5 + TF-IDF + KG (RRF)",
+                           _proc_fusao(("e5", "tfidf", "kg")),
+                           "as três fontes com peso igual"),
+    "e5_taxonomia": Modulo("e5_taxonomia", "E5 guiado pela taxonomia",
+                           _proc_fusao(("e5", "taxonomia"), modo="linear",
+                                       pesos=(1.0, 0.02)),
+                           "cosseno E5 + 0,02 x compatibilidade de classe (LOO) sobre o "
+                           "catálogo inteiro, antes do corte"),
+    "e5_tfidf_taxonomia": Modulo("e5_tfidf_taxonomia", "E5 + TF-IDF (RRF) guiado pela taxonomia",
+                                 _proc_fusao(("e5", "tfidf", "taxonomia"), pesos=(1.0, 1.0, 0.5)),
+                                 "RRF de denso + léxico + taxonomia (peso 0,5)"),
+    # --- fusão só para ESCOLHER candidatos; o score que segue é o cosseno E5 ---
+    "e5_tfidf_cand":    Modulo("e5_tfidf_cand", "candidatos de E5+TF-IDF (RRF), score E5",
+                               _proc_fusao(("e5", "tfidf"), escores="e5"),
+                               "a fusão alarga o top-K; o E5 ordena e os pós recebem cosseno"),
+    "e5_tfidf_kg_cand": Modulo("e5_tfidf_kg_cand", "candidatos de E5+TF-IDF+KG (RRF), score E5",
+                               _proc_fusao(("e5", "tfidf", "kg"), escores="e5"),
+                               "idem, com a busca local do KG como terceira fonte"),
+    "e5_tfidf_lin":     Modulo("e5_tfidf_lin", "E5 + TF-IDF (linear 0,8/0,2)",
+                               _proc_fusao(("e5", "tfidf"), modo="linear", pesos=(0.8, 0.2)),
+                               "soma ponderada de cossenos: mesma escala do E5"),
+    "e5_char_lin":      Modulo("e5_char_lin", "E5 + TF-IDF de caracteres (linear 0,8/0,2)",
+                               _proc_fusao(("e5", "tfidf_char"), modo="linear", pesos=(0.8, 0.2)),
+                               "denso + n-gramas de caracteres: robusto a grafia e abreviação"),
+    "e5_tfidf_char_lin": Modulo("e5_tfidf_char_lin", "E5 + TF-IDF palavra + caractere (linear)",
+                                _proc_fusao(("e5", "tfidf", "tfidf_char"), modo="linear",
+                                            pesos=(0.7, 0.15, 0.15)),
+                                "as três fontes léxico-densas somadas"),
+    "e5_tfidf_kg_lin":  Modulo("e5_tfidf_kg_lin", "E5 + TF-IDF + KG (linear)",
+                               _proc_fusao(("e5", "tfidf", "kg"), modo="linear",
+                                           pesos=(0.8, 0.2, 0.1)),
+                               "soma de cossenos + busca local do KG (IDF normalizado)"),
+    "e5_tfidf_lin_taxonomia": Modulo("e5_tfidf_lin_taxonomia", "E5 + TF-IDF + taxonomia (linear)",
+                                     _proc_fusao(("e5", "tfidf", "taxonomia"), modo="linear",
+                                                 pesos=(0.8, 0.2, 0.02)),
+                                     "a fusão léxico-densa guiada pela compatibilidade de classe"),
+    "e5_tfidf_char_lin_taxonomia": Modulo(
+        "e5_tfidf_char_lin_taxonomia", "E5 + TF-IDF palavra + caractere + taxonomia (linear)",
+        _proc_fusao(("e5", "tfidf", "tfidf_char", "taxonomia"), modo="linear",
+                    pesos=(0.7, 0.15, 0.15, 0.02)),
+        "a melhor fusão léxico-densa, guiada pela compatibilidade de classe (LOO)"),
 }
 
 
@@ -573,6 +839,66 @@ def _bonus_graphrag(corpus: Corpus, textos: Textos, scores: np.ndarray,
     return bonus
 
 
+def _bonus_graphrag_idf(corpus: Corpus, textos: Textos, scores: np.ndarray,
+                        idx: np.ndarray, ctx: dict) -> np.ndarray:
+    """
+    Cobertura de entidades como em `_bonus_graphrag`, mas cada entidade pesa o
+    seu IDF no catálogo (entidade de atributo ainda vale o dobro). Uma consulta
+    coberta em DESCARTAVEL e ESTERIL não está coberta em nada; coberta em
+    ORTOFTALALDEIDO, está quase resolvida.
+    """
+    ctx.setdefault("_corpus", corpus)
+    kg = _kg_de(ctx)
+    idf = _idf_entidades(kg, ctx)
+
+    def _peso(ent: str) -> float:
+        base = 1.0 if ent.startswith("TOK::") else 2.0
+        return base * idf.get(ent, 1.0)
+
+    bonus = np.zeros_like(scores)
+    for i in range(idx.shape[0]):
+        proprias = kg.ents_consulta.get(i, set())
+        relevantes = {e for e in proprias if not e.startswith("PDM::")} or proprias
+        if not relevantes:
+            continue
+        total = sum(_peso(e) for e in relevantes)
+        if total <= 0:
+            continue
+        for k, j in enumerate(idx[i]):
+            comuns = relevantes & kg.ents_catalogo.get(int(j), set())
+            if comuns:
+                bonus[i, k] = sum(_peso(e) for e in comuns) / total
+    return bonus
+
+
+def _bonus_taxonomia(corpus: Corpus, textos: Textos, scores: np.ndarray,
+                     idx: np.ndarray, ctx: dict) -> np.ndarray:
+    """
+    Compatibilidade entre a classe e-Fisco da consulta e a classe CATMAT do
+    candidato, estimada nos vínculos conhecidos em leave-one-out (ver
+    `taxonomia.py`). Sinal ontológico: usa o metadado de classificação dos dois
+    catálogos, que o texto do item não carrega.
+    """
+    ctx.setdefault("_corpus", corpus)
+    return np.take_along_axis(_matriz_taxonomia(ctx), idx, axis=1)
+
+
+def _bonus_taxonomia_rotulo(corpus: Corpus, textos: Textos, scores: np.ndarray,
+                            idx: np.ndarray, ctx: dict) -> np.ndarray:
+    """
+    Alinhamento das taxonomias SÓ pelo texto dos rótulos de classe (E5), sem
+    nenhum vínculo conhecido: é o controle do `taxonomia` — quanto do ganho é
+    a informação dos vínculos e quanto é só o rótulo.
+    """
+    from . import taxonomia as tx
+
+    al = ctx.get("_taxonomia_rotulos")
+    if al is None:
+        al = tx.alinhamento_rotulos(corpus.consultas, corpus.catalogo, MODELO_EMBEDDING)
+        ctx["_taxonomia_rotulos"] = al
+    return tx.bonus_top_k(al, idx)
+
+
 def _medidas_do_corpus(corpus: Corpus, ctx: dict) -> tuple[list, list]:
     """Medidas tipadas dos dois lados, extraidas do texto CRU e memorizadas.
 
@@ -655,7 +981,7 @@ def _misturar(scores: np.ndarray, bonus: np.ndarray, peso: float) -> np.ndarray:
     return (1.0 - peso) * scores + peso * bonus
 
 
-def _pos_aditivo(*bonus_fns: Callable) -> Callable:
+def _pos_aditivo(*bonus_fns: Callable, pesos: tuple[float, ...] | None = None) -> Callable:
     """
     Monta um pos-processador que SOMA o sinal ao score, com peso pequeno.
 
@@ -668,12 +994,30 @@ def _pos_aditivo(*bonus_fns: Callable) -> Callable:
 
     Aqui `peso_medidas` e o parametro, e nao `peso_pos`, para que ajustar este
     sinal nao mexa nos pos-processadores publicados em RESULTADOS.md.
+
+    Sem `pesos`, os sinais entram pela MEDIA (comportamento original, que e o
+    dos numeros publicados). Com `pesos`, cada sinal entra multiplicado pelo
+    seu peso relativo -- e o que permite somar um terceiro sinal sem diluir os
+    dois que ja funcionavam.
+
+    O peso relativo de cada sinal pode ainda ser ajustado por execucao com
+    `ctx["peso_rel_<sinal>"]` (CLI: --peso-rel medidas=1,taxonomia=0.4), onde
+    <sinal> e o nome da funcao de bonus sem o prefixo `_bonus_`. E o que a
+    varredura usa para achar a escala certa de um sinal novo sem editar codigo.
     """
+    nomes = [fn.__name__.removeprefix("_bonus_") for fn in bonus_fns]
+
     def aplicar(corpus: Corpus, textos: Textos, scores: np.ndarray,
                 idx: np.ndarray, ctx: dict) -> np.ndarray:
-        total = sum(fn(corpus, textos, scores, idx, ctx) for fn in bonus_fns)
         peso = ctx.get("peso_medidas", PESO_MEDIDAS_PADRAO)
-        return scores + peso * (total / len(bonus_fns))
+        relativos = [ctx.get(f"peso_rel_{nome}", 1.0) for nome in nomes]
+        if pesos is None:
+            total = sum(r * fn(corpus, textos, scores, idx, ctx)
+                        for r, fn in zip(relativos, bonus_fns))
+            return scores + peso * (total / len(bonus_fns))
+        total = sum(p * r * fn(corpus, textos, scores, idx, ctx)
+                    for p, r, fn in zip(pesos, relativos, bonus_fns))
+        return scores + peso * total
     return aplicar
 
 
@@ -720,6 +1064,44 @@ POS_PROCESSADORES: dict[str, Modulo] = {
     "medidas_conflito": Modulo("medidas_conflito", "Medida tipada, com penalidade",
                                _pos_medidas_conflito,
                                "variante reprovada na medição; ver docstring"),
+    # --- GraphRAG com IDF -------------------------------------------------------
+    "graphrag_idf": Modulo("graphrag_idf", "GraphRAG (cobertura ponderada por IDF)",
+                           _pos_de(_bonus_graphrag_idf),
+                           f"cobertura de entidades, cada uma pesando seu IDF (peso {PESO_POS_PADRAO})"),
+    "graphrag_idf_aditivo": Modulo("graphrag_idf_aditivo", "GraphRAG IDF (aditivo)",
+                                   _pos_aditivo(_bonus_graphrag_idf),
+                                   "a mesma cobertura IDF, somada com peso pequeno em vez de "
+                                   "misturada (isola o efeito da forma de combinar)"),
+    "medidas_graphrag_idf": Modulo("medidas_graphrag_idf", "Medida tipada + GraphRAG IDF",
+                                   _pos_aditivo(_bonus_medidas, _bonus_graphrag_idf),
+                                   "medida convertida + cobertura IDF (aditivo)"),
+    # --- taxonomia (ontologia de classes dos dois catálogos) ---------------------
+    "taxonomia": Modulo("taxonomia", "Taxonomia (classe e-Fisco -> classe CATMAT, LOO)",
+                        _pos_aditivo(_bonus_taxonomia),
+                        "compatibilidade de classe estimada nos vínculos, leave-one-out "
+                        f"(aditivo, peso {PESO_MEDIDAS_PADRAO})"),
+    "taxonomia_rotulo": Modulo("taxonomia_rotulo", "Taxonomia só por rótulo (E5)",
+                               _pos_aditivo(_bonus_taxonomia_rotulo),
+                               "alinhamento das classes pelo texto do rótulo, sem histórico "
+                               "(controle do `taxonomia`)"),
+    "medidas_taxonomia": Modulo("medidas_taxonomia", "Medida tipada + taxonomia",
+                                _pos_aditivo(_bonus_medidas, _bonus_taxonomia, pesos=(1.0, 1.0)),
+                                "os dois sinais somados, cada um com peso inteiro"),
+    "medidas_graphrag_taxonomia": Modulo(
+        "medidas_graphrag_taxonomia", "Medida + GraphRAG + taxonomia",
+        _pos_aditivo(_bonus_medidas, _bonus_graphrag, _bonus_taxonomia, pesos=(1.0, 1.0, 1.0)),
+        "medida convertida + cobertura de entidades + compatibilidade de classe"),
+    "medidas_graphrag_idf_taxonomia": Modulo(
+        "medidas_graphrag_idf_taxonomia", "Medida + GraphRAG IDF + taxonomia",
+        _pos_aditivo(_bonus_medidas, _bonus_graphrag_idf, _bonus_taxonomia, pesos=(1.0, 1.0, 1.0)),
+        "idem, com a cobertura ponderada por IDF"),
+    # Pesos relativos calibrados por varredura no bigdata_profs (ver
+    # docs/RESULTADOS-BIGDATA-PROFS.md): a medida quer peso menor que no MMH, a
+    # cobertura IDF quer o peso inteiro e a taxonomia entra como desempate.
+    "combinado_calibrado": Modulo(
+        "combinado_calibrado", "Medida 0,6 + GraphRAG IDF 1,0 + taxonomia 0,3",
+        _pos_aditivo(_bonus_medidas, _bonus_graphrag_idf, _bonus_taxonomia, pesos=(0.6, 1.0, 0.3)),
+        "os três sinais com pesos relativos calibrados (x peso_medidas)"),
 }
 
 
@@ -779,6 +1161,9 @@ def executar_grade(corpus: Corpus, ids_pre: list[str], ids_proc: list[str],
     reordenam o top-K, como no diagrama.
     """
     ctx = ctx if ctx is not None else {}
+    # Processadores híbridos e o sinal de taxonomia precisam do corpus (o
+    # contrato `fn(textos, top_k, ctx)` não o recebe): fica no contexto.
+    ctx["_corpus"] = corpus
     combinacoes: list[dict] = []
     total = len(ids_pre) * len(ids_proc) * len(ids_pos)
     log.info("Grade: %d pré × %d proc × %d pós = %d combinações.",
@@ -871,8 +1256,21 @@ def _assinatura_pre(mod: Modulo, corpus: Corpus) -> str:
             partes.append(caminho.read_text(encoding="utf-8"))
     # O YAML do perfil entra na assinatura: mudar uma stopword muda os textos,
     # e um cache que sobrevivesse a isso devolveria resultado de outro domínio.
-    for yaml_perfil in ("base.yaml", f"{ctx.perfil.nome}.yaml"):
-        caminho = BASE_DIR / "config" / "perfis" / yaml_perfil
+    # A cadeia de herança inteira entra (compras_publicas herda mmh): editar o
+    # pai também muda os textos do filho.
+    nome = ctx.perfil.nome
+    vistos: list[str] = []
+    while nome and nome not in vistos:
+        vistos.append(nome)
+        caminho = BASE_DIR / "config" / "perfis" / f"{nome}.yaml"
+        if not caminho.exists():
+            break
+        conteudo = caminho.read_text(encoding="utf-8")
+        partes.append(conteudo)
+        m = re.search(r"^herda:\s*(\S+)", conteudo, re.MULTILINE)
+        nome = m.group(1).strip("'\"") if m else "base"
+    if "base" not in vistos:
+        caminho = BASE_DIR / "config" / "perfis" / "base.yaml"
         if caminho.exists():
             partes.append(caminho.read_text(encoding="utf-8"))
     return hashlib.sha1("|".join(partes).encode("utf-8")).hexdigest()[:16]
@@ -1053,13 +1451,19 @@ def plotar_matriz(matriz: pd.DataFrame, metrica: str,
     barra.ax.tick_params(length=0, labelsize=9, colors=_TINTA_MUTED)
     barra.set_label(metrica.upper(), fontsize=10, color=_TINTA_MUTED)
 
-    # Espaço reservado no topo: rótulos das colunas + título + subtítulo.
-    fig.subplots_adjust(top=0.76, left=0.20, right=0.94, bottom=0.06)
+    # Espaço reservado no topo: rótulos das colunas + título + subtítulo. As
+    # posições são em POLEGADAS a partir do topo, e não frações da altura:
+    # com poucas linhas a figura é baixa e frações fixas faziam o título
+    # cair em cima do subtítulo.
+    altura = fig.get_size_inches()[1]
+    y_titulo = 1 - 0.12 / altura          # topo do título a 0,12" da borda
+    y_sub = 1 - 0.48 / altura             # topo do subtítulo a 0,48" (título tem ~0,25")
+    fig.subplots_adjust(top=1 - 1.0 / altura, left=0.20, right=0.94, bottom=0.06)
     fig.suptitle(f"Matriz pré-processador × processador — {metrica.upper()}",
-                 fontsize=15, color=_TINTA, x=0.02, ha="left", y=0.98)
+                 fontsize=15, color=_TINTA, x=0.02, ha="left", y=y_titulo, va="top")
     legenda = "linhas = pré-processador · colunas = processador"
-    fig.text(0.02, 0.925, f"{legenda}{' · ' + subtitulo if subtitulo else ''}",
-             fontsize=9.5, color=_TINTA_MUTED, ha="left")
+    fig.text(0.02, y_sub, f"{legenda}{' · ' + subtitulo if subtitulo else ''}",
+             fontsize=9.5, color=_TINTA_MUTED, ha="left", va="top")
 
     fig.savefig(caminho, bbox_inches="tight", facecolor=_SUPERFICIE)
     plt.close(fig)
@@ -1068,8 +1472,10 @@ def plotar_matriz(matriz: pd.DataFrame, metrica: str,
 
 def exportar(corpus: Corpus, combinacoes: list[dict], ordenadas: list[dict],
              matriz: pd.DataFrame, metrica: str, top_k: int,
-             ids_pre: list[str], ids_proc: list[str], ids_pos: list[str]) -> None:
+             ids_pre: list[str], ids_proc: list[str], ids_pos: list[str],
+             ctx: dict | None = None) -> None:
     """Grava o YAML da grade + a matriz e o ranking em CSV."""
+    ctx = ctx or {}
 
     documento = {
         "INFO": {
@@ -1100,6 +1506,13 @@ def exportar(corpus: Corpus, combinacoes: list[dict], ordenadas: list[dict],
             id_pre: next((c["meta_pre"] for c in combinacoes
                           if c["pre"] == id_pre and c["meta_pre"]), None)
             for id_pre in ids_pre
+        },
+        # O que os sinais de pós-processamento viram no corpus: cobertura do
+        # extrator de medidas e do alinhamento taxonômico. Sem isto um R@3 não
+        # diz se o sinal estava ativo ou calado.
+        "META_SINAIS": {
+            "MEDIDAS": ctx.get("_medidas_resumo"),
+            "TAXONOMIA": ctx.get("_taxonomia_resumo"),
         },
         "MATRIZ": {
             pre: {proc: (None if pd.isna(matriz.loc[pre, proc])
@@ -1206,6 +1619,16 @@ def main() -> None:
                          f"(padrão: {caracteristicas.TOLERANCIA_PADRAO})")
     ap.add_argument("--k-cross", type=int, default=K_CROSS_RERANK,
                     help=f"profundidade do cross-encoder (padrão: {K_CROSS_RERANK})")
+    ap.add_argument("--peso-fusao", default="",
+                    help="pesos por fonte nos processadores híbridos, ex. 'tfidf=0.3,kg=0.1'")
+    ap.add_argument("--peso-rel", default="",
+                    help="pesos relativos por sinal nos pós aditivos, ex. "
+                         "'medidas=1,taxonomia=0.4,graphrag_idf=1' (padrão: todos 1)")
+    ap.add_argument("--taxonomia-peso-grupo", type=float,
+                    help="peso do nível de grupo no sinal de taxonomia quando a classe é "
+                         "conhecida (padrão: 0.3; 0 desliga o backoff parcial)")
+    ap.add_argument("--taxonomia-min-obs", type=int,
+                    help="vínculos mínimos da classe e-Fisco para o sinal opinar (padrão: 2)")
     ap.add_argument("--graphrag-ms", action="store_true",
                     help="usa o índice Microsoft GraphRAG na expansão (requer API key)")
     ap.add_argument("--sem-cache", action="store_true",
@@ -1232,6 +1655,16 @@ def main() -> None:
         "graphrag_ms": args.graphrag_ms,
         "api_key": os.environ.get("OPENAI_API_KEY", ""),
     }
+    for par in filter(None, (p.strip() for p in args.peso_rel.split(","))):
+        nome, _, valor = par.partition("=")
+        ctx[f"peso_rel_{nome.strip()}"] = float(valor)
+    for par in filter(None, (p.strip() for p in args.peso_fusao.split(","))):
+        nome, _, valor = par.partition("=")
+        ctx[f"peso_fusao_{nome.strip()}"] = float(valor)
+    if args.taxonomia_peso_grupo is not None:
+        ctx["taxonomia_peso_grupo"] = args.taxonomia_peso_grupo
+    if args.taxonomia_min_obs is not None:
+        ctx["taxonomia_min_obs"] = args.taxonomia_min_obs
 
     corpus = carregar_corpus(args.arquivo, amostra=args.amostra)
     inicio = time.time()
@@ -1242,7 +1675,7 @@ def main() -> None:
     imprimir_matriz(matriz, args.metrica)
     ordenadas = imprimir_ranking(combinacoes, args.metrica)
     exportar(corpus, combinacoes, ordenadas, matriz, args.metrica,
-             args.top_k, ids_pre, ids_proc, ids_pos)
+             args.top_k, ids_pre, ids_proc, ids_pos, ctx=ctx)
 
     print(f"\nTempo total: {time.time() - inicio:.1f}s")
 

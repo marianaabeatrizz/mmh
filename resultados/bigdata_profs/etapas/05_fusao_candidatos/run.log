@@ -1,0 +1,50 @@
+INFO | Dataset: bigdata_profs | perfil: compras_publicas
+INFO | Corpus [bigdata_profs]: 1375 consultas x 1297 itens de catálogo (1375 com gabarito).
+INFO | Grade: 1 pré × 5 proc × 3 pós = 15 combinações.
+INFO | [pré/basico] Textos reaproveitados do cache: pre_basico_42b1c31ff2e2e5fe.json
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_basico_d3935162a3ff8289.npz
+INFO |   basico         | e5        | nada      -> MRR 0.6689  R@1 0.562  R@3 0.743
+INFO | [pós/medidas] consultas com medida: 1015/1375 | catálogo: 865/1297 | bases: MM=654, ML=181, G=159, PCT=137, V=72, MG_ML=54
+INFO | [GraphRAG/pré] KG: 12380 nós, 32261 arestas, 9708 entidades, 98 comunidades
+INFO |   basico         | e5        | medidas_graphrag_idf -> MRR 0.7044  R@1 0.602  R@3 0.789
+INFO | [taxonomia] histórico: 162 classes e-Fisco x 154 classes CATMAT, 324 pares de classe distintos, 148 de grupo.
+INFO | [taxonomia] correto com compatibilidade > 0 (LOO): 91.8% das consultas; classe sem histórico: 133
+INFO |   basico         | e5        | medidas_graphrag_idf_taxonomia -> MRR 0.6898  R@1 0.586  R@3 0.778
+INFO |   basico         | e5_tfidf_cand | nada      -> MRR 0.6754  R@1 0.564  R@3 0.750
+INFO |   basico         | e5_tfidf_cand | medidas_graphrag_idf -> MRR 0.7101  R@1 0.605  R@3 0.793
+INFO |   basico         | e5_tfidf_cand | medidas_graphrag_idf_taxonomia -> MRR 0.6961  R@1 0.588  R@3 0.786
+INFO |   basico         | e5_tfidf_kg_cand | nada      -> MRR 0.6861  R@1 0.575  R@3 0.761
+INFO |   basico         | e5_tfidf_kg_cand | medidas_graphrag_idf -> MRR 0.7146  R@1 0.609  R@3 0.798
+INFO |   basico         | e5_tfidf_kg_cand | medidas_graphrag_idf_taxonomia -> MRR 0.6981  R@1 0.588  R@3 0.789
+INFO |   basico         | e5_tfidf_lin | nada      -> MRR 0.7300  R@1 0.626  R@3 0.809
+INFO |   basico         | e5_tfidf_lin | medidas_graphrag_idf -> MRR 0.7418  R@1 0.642  R@3 0.820
+INFO |   basico         | e5_tfidf_lin | medidas_graphrag_idf_taxonomia -> MRR 0.7320  R@1 0.630  R@3 0.815
+INFO |   basico         | e5_taxonomia | nada      -> MRR 0.6726  R@1 0.567  R@3 0.748
+INFO |   basico         | e5_taxonomia | medidas_graphrag_idf -> MRR 0.7139  R@1 0.618  R@3 0.791
+INFO |   basico         | e5_taxonomia | medidas_graphrag_idf_taxonomia -> MRR 0.6723  R@1 0.563  R@3 0.764
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                                e5     e5_tfidf_cand  e5_tfidf_kg_cand      e5_tfidf_lin      e5_taxonomia
+basico                      0.7425           0.7498*           0.7615*           0.8087*            0.7476
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   basico + e5_tfidf_lin + medidas_graphrag_idf      0.8196   0.642   0.820   0.918     0.2
+2   basico + e5_tfidf_lin + medidas_graphrag_idf_taxonomia    0.8145   0.630   0.815   0.912     0.2
+3   basico + e5_tfidf_lin + nada                      0.8087   0.626   0.809   0.911     0.1
+4   basico + e5_tfidf_kg_cand + medidas_graphrag_idf    0.7978   0.609   0.798   0.908     0.7
+5   basico + e5_tfidf_cand + medidas_graphrag_idf     0.7935   0.605   0.793   0.900     1.0
+6   basico + e5_taxonomia + medidas_graphrag_idf      0.7913   0.618   0.791   0.884     0.2
+7   basico + e5 + medidas_graphrag_idf                0.7891   0.602   0.789   0.886     4.5
+8   basico + e5_tfidf_kg_cand + medidas_graphrag_idf_taxonomia    0.7891   0.588   0.789   0.901     0.7
+9   basico + e5_tfidf_cand + medidas_graphrag_idf_taxonomia    0.7862   0.588   0.786   0.897     1.0
+10  basico + e5 + medidas_graphrag_idf_taxonomia      0.7782   0.586   0.778   0.877     2.9
+
+=== ARQUIVOS GERADOS ===
+  C:\Users\Educação\mmh\resultados\bigdata_profs\avaliacao_modular.yaml
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_pre_x_proc.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\ranking_combinacoes.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_modular.png
+
+Tempo total: 11.2s

@@ -1,0 +1,163 @@
+INFO | Dataset: bigdata_profs | perfil: mmh
+INFO | Corpus [bigdata_profs]: 1375 consultas x 1297 itens de catálogo (1375 com gabarito).
+INFO | Grade: 2 pré × 6 proc × 10 pós = 120 combinações.
+INFO | [pré/nada] Textos reaproveitados do cache: pre_nada_2a96c9fb2f52dae3.json
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_nada_f42766a71c1cc825.npz
+INFO |   nada           | e5        | nada      -> MRR 0.6748  R@1 0.569  R@3 0.740
+INFO | [pós/medidas] consultas com medida: 761/1375 | catálogo: 639/1297 | bases: MM=654, ML=181, G_GAUGE=49, FR=40
+INFO |   nada           | e5        | medidas   -> MRR 0.6673  R@1 0.556  R@3 0.738
+INFO | [GraphRAG/pré] KG: 12380 nós, 32261 arestas, 9708 entidades, 98 comunidades
+INFO |   nada           | e5        | medidas_graphrag -> MRR 0.7019  R@1 0.599  R@3 0.772
+INFO |   nada           | e5        | graphrag_idf -> MRR 0.6442  R@1 0.522  R@3 0.722
+INFO |   nada           | e5        | medidas_graphrag_idf -> MRR 0.7092  R@1 0.607  R@3 0.782
+INFO | [taxonomia] histórico: 162 classes e-Fisco x 154 classes CATMAT, 324 pares de classe distintos, 148 de grupo.
+INFO | [taxonomia] correto com compatibilidade > 0 (LOO): 91.8% das consultas; classe sem histórico: 133
+INFO |   nada           | e5        | taxonomia -> MRR 0.6573  R@1 0.546  R@3 0.726
+INFO | No device provided, using cpu
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+INFO | Loading SentenceTransformer model from intfloat/multilingual-e5-base.
+INFO | [taxonomia] rótulos: 162 x 156 classes, 46 x 50 grupos alinhados por E5.
+INFO |   nada           | e5        | taxonomia_rotulo -> MRR 0.6709  R@1 0.564  R@3 0.739
+INFO |   nada           | e5        | medidas_taxonomia -> MRR 0.6700  R@1 0.561  R@3 0.737
+INFO |   nada           | e5        | medidas_graphrag_taxonomia -> MRR 0.6885  R@1 0.581  R@3 0.765
+INFO |   nada           | e5        | medidas_graphrag_idf_taxonomia -> MRR 0.7007  R@1 0.598  R@3 0.774
+INFO |   nada           | e5_tfidf  | nada      -> MRR 0.6744  R@1 0.563  R@3 0.746
+INFO |   nada           | e5_tfidf  | medidas   -> MRR 0.6595  R@1 0.542  R@3 0.737
+INFO |   nada           | e5_tfidf  | medidas_graphrag -> MRR 0.6469  R@1 0.521  R@3 0.735
+INFO |   nada           | e5_tfidf  | graphrag_idf -> MRR 0.5774  R@1 0.434  R@3 0.666
+INFO |   nada           | e5_tfidf  | medidas_graphrag_idf -> MRR 0.6558  R@1 0.534  R@3 0.740
+INFO |   nada           | e5_tfidf  | taxonomia -> MRR 0.6120  R@1 0.487  R@3 0.684
+INFO |   nada           | e5_tfidf  | taxonomia_rotulo -> MRR 0.6154  R@1 0.493  R@3 0.690
+INFO |   nada           | e5_tfidf  | medidas_taxonomia -> MRR 0.6185  R@1 0.491  R@3 0.699
+INFO |   nada           | e5_tfidf  | medidas_graphrag_taxonomia -> MRR 0.6013  R@1 0.458  R@3 0.699
+INFO |   nada           | e5_tfidf  | medidas_graphrag_idf_taxonomia -> MRR 0.6257  R@1 0.492  R@3 0.722
+INFO |   nada           | e5_kg     | nada      -> MRR 0.5983  R@1 0.474  R@3 0.676
+INFO |   nada           | e5_kg     | medidas   -> MRR 0.6015  R@1 0.476  R@3 0.684
+INFO |   nada           | e5_kg     | medidas_graphrag -> MRR 0.5848  R@1 0.456  R@3 0.668
+INFO |   nada           | e5_kg     | graphrag_idf -> MRR 0.5294  R@1 0.394  R@3 0.605
+INFO |   nada           | e5_kg     | medidas_graphrag_idf -> MRR 0.5929  R@1 0.466  R@3 0.680
+INFO |   nada           | e5_kg     | taxonomia -> MRR 0.5506  R@1 0.416  R@3 0.627
+INFO |   nada           | e5_kg     | taxonomia_rotulo -> MRR 0.5515  R@1 0.409  R@3 0.638
+INFO |   nada           | e5_kg     | medidas_taxonomia -> MRR 0.5715  R@1 0.436  R@3 0.653
+INFO |   nada           | e5_kg     | medidas_graphrag_taxonomia -> MRR 0.5633  R@1 0.428  R@3 0.652
+INFO |   nada           | e5_kg     | medidas_graphrag_idf_taxonomia -> MRR 0.5779  R@1 0.445  R@3 0.663
+INFO |   nada           | e5_tfidf_kg | nada      -> MRR 0.6431  R@1 0.527  R@3 0.720
+INFO |   nada           | e5_tfidf_kg | medidas   -> MRR 0.6415  R@1 0.521  R@3 0.728
+INFO |   nada           | e5_tfidf_kg | medidas_graphrag -> MRR 0.6305  R@1 0.505  R@3 0.720
+INFO |   nada           | e5_tfidf_kg | graphrag_idf -> MRR 0.5416  R@1 0.403  R@3 0.622
+INFO |   nada           | e5_tfidf_kg | medidas_graphrag_idf -> MRR 0.6364  R@1 0.516  R@3 0.720
+INFO |   nada           | e5_tfidf_kg | taxonomia -> MRR 0.5979  R@1 0.466  R@3 0.689
+INFO |   nada           | e5_tfidf_kg | taxonomia_rotulo -> MRR 0.6071  R@1 0.479  R@3 0.694
+INFO |   nada           | e5_tfidf_kg | medidas_taxonomia -> MRR 0.6123  R@1 0.481  R@3 0.712
+INFO |   nada           | e5_tfidf_kg | medidas_graphrag_taxonomia -> MRR 0.5911  R@1 0.450  R@3 0.695
+INFO |   nada           | e5_tfidf_kg | medidas_graphrag_idf_taxonomia -> MRR 0.6100  R@1 0.476  R@3 0.713
+INFO |   nada           | e5_taxonomia | nada      -> MRR 0.6524  R@1 0.545  R@3 0.721
+INFO |   nada           | e5_taxonomia | medidas   -> MRR 0.6555  R@1 0.546  R@3 0.729
+INFO |   nada           | e5_taxonomia | medidas_graphrag -> MRR 0.6868  R@1 0.588  R@3 0.755
+INFO |   nada           | e5_taxonomia | graphrag_idf -> MRR 0.6424  R@1 0.530  R@3 0.714
+INFO |   nada           | e5_taxonomia | medidas_graphrag_idf -> MRR 0.6938  R@1 0.596  R@3 0.761
+INFO |   nada           | e5_taxonomia | taxonomia -> MRR 0.6074  R@1 0.505  R@3 0.666
+INFO |   nada           | e5_taxonomia | taxonomia_rotulo -> MRR 0.6368  R@1 0.529  R@3 0.703
+INFO |   nada           | e5_taxonomia | medidas_taxonomia -> MRR 0.6250  R@1 0.518  R@3 0.691
+INFO |   nada           | e5_taxonomia | medidas_graphrag_taxonomia -> MRR 0.6477  R@1 0.543  R@3 0.716
+INFO |   nada           | e5_taxonomia | medidas_graphrag_idf_taxonomia -> MRR 0.6614  R@1 0.558  R@3 0.728
+INFO |   nada           | e5_tfidf_taxonomia | nada      -> MRR 0.6272  R@1 0.478  R@3 0.739
+INFO |   nada           | e5_tfidf_taxonomia | medidas   -> MRR 0.6295  R@1 0.489  R@3 0.730
+INFO |   nada           | e5_tfidf_taxonomia | medidas_graphrag -> MRR 0.6350  R@1 0.498  R@3 0.732
+INFO |   nada           | e5_tfidf_taxonomia | graphrag_idf -> MRR 0.5727  R@1 0.421  R@3 0.665
+INFO |   nada           | e5_tfidf_taxonomia | medidas_graphrag_idf -> MRR 0.6521  R@1 0.521  R@3 0.737
+INFO |   nada           | e5_tfidf_taxonomia | taxonomia -> MRR 0.5490  R@1 0.399  R@3 0.638
+INFO |   nada           | e5_tfidf_taxonomia | taxonomia_rotulo -> MRR 0.5698  R@1 0.418  R@3 0.673
+INFO |   nada           | e5_tfidf_taxonomia | medidas_taxonomia -> MRR 0.5746  R@1 0.430  R@3 0.664
+INFO |   nada           | e5_tfidf_taxonomia | medidas_graphrag_taxonomia -> MRR 0.5828  R@1 0.438  R@3 0.671
+INFO |   nada           | e5_tfidf_taxonomia | medidas_graphrag_idf_taxonomia -> MRR 0.6066  R@1 0.467  R@3 0.698
+INFO | [pré/basico] Textos reaproveitados do cache: pre_basico_f8a5e9f61d04f9f3.json
+INFO | [proc/e5] Embeddings reaproveitados do cache: e5_basico_d3935162a3ff8289.npz
+INFO |   basico         | e5        | nada      -> MRR 0.6689  R@1 0.562  R@3 0.743
+INFO |   basico         | e5        | medidas   -> MRR 0.6588  R@1 0.548  R@3 0.738
+INFO |   basico         | e5        | medidas_graphrag -> MRR 0.6926  R@1 0.586  R@3 0.778
+INFO |   basico         | e5        | graphrag_idf -> MRR 0.6432  R@1 0.526  R@3 0.727
+INFO |   basico         | e5        | medidas_graphrag_idf -> MRR 0.7049  R@1 0.604  R@3 0.787
+INFO |   basico         | e5        | taxonomia -> MRR 0.6457  R@1 0.537  R@3 0.717
+INFO |   basico         | e5        | taxonomia_rotulo -> MRR 0.6609  R@1 0.558  R@3 0.726
+INFO |   basico         | e5        | medidas_taxonomia -> MRR 0.6519  R@1 0.541  R@3 0.730
+INFO |   basico         | e5        | medidas_graphrag_taxonomia -> MRR 0.6770  R@1 0.570  R@3 0.759
+INFO |   basico         | e5        | medidas_graphrag_idf_taxonomia -> MRR 0.6879  R@1 0.583  R@3 0.777
+INFO |   basico         | e5_tfidf  | nada      -> MRR 0.7097  R@1 0.602  R@3 0.788
+INFO |   basico         | e5_tfidf  | medidas   -> MRR 0.6852  R@1 0.567  R@3 0.771
+INFO |   basico         | e5_tfidf  | medidas_graphrag -> MRR 0.6718  R@1 0.546  R@3 0.768
+INFO |   basico         | e5_tfidf  | graphrag_idf -> MRR 0.5958  R@1 0.452  R@3 0.696
+INFO |   basico         | e5_tfidf  | medidas_graphrag_idf -> MRR 0.6725  R@1 0.547  R@3 0.766
+INFO |   basico         | e5_tfidf  | taxonomia -> MRR 0.6326  R@1 0.513  R@3 0.707
+INFO |   basico         | e5_tfidf  | taxonomia_rotulo -> MRR 0.6240  R@1 0.500  R@3 0.700
+INFO |   basico         | e5_tfidf  | medidas_taxonomia -> MRR 0.6350  R@1 0.513  R@3 0.712
+INFO |   basico         | e5_tfidf  | medidas_graphrag_taxonomia -> MRR 0.6170  R@1 0.480  R@3 0.710
+INFO |   basico         | e5_tfidf  | medidas_graphrag_idf_taxonomia -> MRR 0.6349  R@1 0.503  R@3 0.731
+INFO |   basico         | e5_kg     | nada      -> MRR 0.6028  R@1 0.482  R@3 0.674
+INFO |   basico         | e5_kg     | medidas   -> MRR 0.6082  R@1 0.486  R@3 0.681
+INFO |   basico         | e5_kg     | medidas_graphrag -> MRR 0.5861  R@1 0.458  R@3 0.667
+INFO |   basico         | e5_kg     | graphrag_idf -> MRR 0.5264  R@1 0.391  R@3 0.594
+INFO |   basico         | e5_kg     | medidas_graphrag_idf -> MRR 0.5961  R@1 0.471  R@3 0.678
+INFO |   basico         | e5_kg     | taxonomia -> MRR 0.5547  R@1 0.425  R@3 0.626
+INFO |   basico         | e5_kg     | taxonomia_rotulo -> MRR 0.5539  R@1 0.421  R@3 0.636
+INFO |   basico         | e5_kg     | medidas_taxonomia -> MRR 0.5745  R@1 0.442  R@3 0.656
+INFO |   basico         | e5_kg     | medidas_graphrag_taxonomia -> MRR 0.5625  R@1 0.428  R@3 0.646
+INFO |   basico         | e5_kg     | medidas_graphrag_idf_taxonomia -> MRR 0.5787  R@1 0.446  R@3 0.668
+INFO |   basico         | e5_tfidf_kg | nada      -> MRR 0.6639  R@1 0.542  R@3 0.750
+INFO |   basico         | e5_tfidf_kg | medidas   -> MRR 0.6591  R@1 0.535  R@3 0.745
+INFO |   basico         | e5_tfidf_kg | medidas_graphrag -> MRR 0.6437  R@1 0.514  R@3 0.736
+INFO |   basico         | e5_tfidf_kg | graphrag_idf -> MRR 0.5570  R@1 0.417  R@3 0.633
+INFO |   basico         | e5_tfidf_kg | medidas_graphrag_idf -> MRR 0.6493  R@1 0.528  R@3 0.732
+INFO |   basico         | e5_tfidf_kg | taxonomia -> MRR 0.6180  R@1 0.486  R@3 0.704
+INFO |   basico         | e5_tfidf_kg | taxonomia_rotulo -> MRR 0.6322  R@1 0.502  R@3 0.719
+INFO |   basico         | e5_tfidf_kg | medidas_taxonomia -> MRR 0.6284  R@1 0.497  R@3 0.717
+INFO |   basico         | e5_tfidf_kg | medidas_graphrag_taxonomia -> MRR 0.6079  R@1 0.471  R@3 0.698
+INFO |   basico         | e5_tfidf_kg | medidas_graphrag_idf_taxonomia -> MRR 0.6214  R@1 0.489  R@3 0.711
+INFO |   basico         | e5_taxonomia | nada      -> MRR 0.6392  R@1 0.535  R@3 0.708
+INFO |   basico         | e5_taxonomia | medidas   -> MRR 0.6391  R@1 0.532  R@3 0.714
+INFO |   basico         | e5_taxonomia | medidas_graphrag -> MRR 0.6689  R@1 0.565  R@3 0.750
+INFO |   basico         | e5_taxonomia | graphrag_idf -> MRR 0.6322  R@1 0.524  R@3 0.707
+INFO |   basico         | e5_taxonomia | medidas_graphrag_idf -> MRR 0.6829  R@1 0.586  R@3 0.759
+INFO |   basico         | e5_taxonomia | taxonomia -> MRR 0.5933  R@1 0.492  R@3 0.651
+INFO |   basico         | e5_taxonomia | taxonomia_rotulo -> MRR 0.6197  R@1 0.518  R@3 0.682
+INFO |   basico         | e5_taxonomia | medidas_taxonomia -> MRR 0.6070  R@1 0.501  R@3 0.670
+INFO |   basico         | e5_taxonomia | medidas_graphrag_taxonomia -> MRR 0.6329  R@1 0.531  R@3 0.700
+INFO |   basico         | e5_taxonomia | medidas_graphrag_idf_taxonomia -> MRR 0.6421  R@1 0.537  R@3 0.724
+INFO |   basico         | e5_tfidf_taxonomia | nada      -> MRR 0.6312  R@1 0.472  R@3 0.766
+INFO |   basico         | e5_tfidf_taxonomia | medidas   -> MRR 0.6278  R@1 0.476  R@3 0.747
+INFO |   basico         | e5_tfidf_taxonomia | medidas_graphrag -> MRR 0.6451  R@1 0.502  R@3 0.757
+INFO |   basico         | e5_tfidf_taxonomia | graphrag_idf -> MRR 0.5900  R@1 0.439  R@3 0.691
+INFO |   basico         | e5_tfidf_taxonomia | medidas_graphrag_idf -> MRR 0.6638  R@1 0.528  R@3 0.771
+INFO |   basico         | e5_tfidf_taxonomia | taxonomia -> MRR 0.5485  R@1 0.388  R@3 0.660
+INFO |   basico         | e5_tfidf_taxonomia | taxonomia_rotulo -> MRR 0.5635  R@1 0.406  R@3 0.677
+INFO |   basico         | e5_tfidf_taxonomia | medidas_taxonomia -> MRR 0.5750  R@1 0.424  R@3 0.676
+INFO |   basico         | e5_tfidf_taxonomia | medidas_graphrag_taxonomia -> MRR 0.5877  R@1 0.437  R@3 0.690
+INFO |   basico         | e5_tfidf_taxonomia | medidas_graphrag_idf_taxonomia -> MRR 0.6163  R@1 0.476  R@3 0.716
+
+=== MATRIZ pré × proc (recall_at_3, sem pós-processamento) ===
+                                  e5            e5_tfidf               e5_kg         e5_tfidf_kg        e5_taxonomia  e5_tfidf_taxonomia
+nada                          0.7404              0.7462              0.6756              0.7200              0.7207              0.7389
+basico                        0.7425             0.7884*              0.6742             0.7498*              0.7084             0.7665*
+  (*) três melhores células
+
+=== RANK DAS MELHORES COMBINAÇÕES (por recall_at_3) ===
+#   combinação                                    recall_at_3     R@1     R@3    R@10       s
+1   basico + e5_tfidf + nada                          0.7884   0.602   0.788   0.910     1.2
+2   basico + e5 + medidas_graphrag_idf                0.7869   0.604   0.787   0.886     0.3
+3   nada + e5 + medidas_graphrag_idf                  0.7818   0.607   0.782   0.900     0.2
+4   basico + e5 + medidas_graphrag                    0.7782   0.586   0.778   0.885     0.3
+5   basico + e5 + medidas_graphrag_idf_taxonomia      0.7767   0.583   0.777   0.876     0.3
+6   nada + e5 + medidas_graphrag_idf_taxonomia        0.7738   0.598   0.774   0.889     0.3
+7   nada + e5 + medidas_graphrag                      0.7724   0.599   0.772   0.897     2.7
+8   basico + e5_tfidf + medidas                       0.7709   0.567   0.771   0.909     1.3
+9   basico + e5_tfidf_taxonomia + medidas_graphrag_idf    0.7709   0.528   0.771   0.916     0.7
+10  basico + e5_tfidf + medidas_graphrag              0.7680   0.546   0.768   0.908     1.4
+
+=== ARQUIVOS GERADOS ===
+  C:\Users\Educação\mmh\resultados\bigdata_profs\avaliacao_modular.yaml
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_pre_x_proc.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\ranking_combinacoes.csv
+  C:\Users\Educação\mmh\resultados\bigdata_profs\matriz_modular.png
+
+Tempo total: 61.7s

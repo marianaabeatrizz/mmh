@@ -56,6 +56,38 @@ CONFIG_DIR = BASE_DIR / "config"
 DATASETS_DIR = CONFIG_DIR / "datasets"
 PERFIS_DIR = CONFIG_DIR / "perfis"
 
+
+def carregar_dotenv(nome: str = ".env") -> None:
+    """
+    Carrega variáveis de um `.env` (raiz do repositório ou diretório atual) para
+    `os.environ`, sem sobrescrever o que já está no ambiente e sem depender de
+    python-dotenv. Chamado no import deste módulo — o ponto por onde todo módulo
+    do pacote passa —, para que a grade modular, a varredura e o serviço vejam
+    a mesma chave que o pipeline. (Antes só o pipeline a carregava, e a grade com
+    `--graphrag-ms` gravava uma chave vazia no workspace do índice.)
+    """
+    vistos = set()
+    for p in (BASE_DIR / nome, Path.cwd() / nome):
+        p = p.resolve()
+        if p in vistos or not p.exists():
+            continue
+        vistos.add(p)
+        try:
+            for linha in p.read_text(encoding="utf-8").splitlines():
+                linha = linha.strip()
+                if not linha or linha.startswith("#") or "=" not in linha:
+                    continue
+                chave, _, valor = linha.partition("=")
+                chave = chave.strip()
+                valor = valor.strip().strip('"').strip("'")
+                if chave and valor:
+                    os.environ.setdefault(chave, valor)
+        except OSError as exc:
+            log.warning(".env ilegível (%s): %s", p, exc)
+
+
+carregar_dotenv()
+
 DATASET_PADRAO = os.environ.get("CM_DATASET", "mmh")
 
 # ---------------------------------------------------------------------------
@@ -554,19 +586,38 @@ def carregar_dataset(nome: str) -> DatasetSpec:
     return DatasetSpec.de_dict(dados.get("nome", nome), dados)
 
 
+def _ler_perfil_yaml(nome: str, visitados: tuple[str, ...] = ()) -> dict:
+    """
+    Dicionário de `perfis/<nome>.yaml` já fundido sobre o perfil que ele declara
+    em `herda:` (recursivo). `base` é a raiz de todos e não herda de ninguém.
+
+    A herança existe para que um perfil multi-domínio possa DIZER "é o MMH mais
+    massa, dose e concentração" em vinte linhas, em vez de copiar o YAML inteiro
+    e deixar duas cópias do mesmo léxico divergirem em silêncio.
+    """
+    if nome in visitados:
+        raise ValueError(f"herança circular de perfis: {' -> '.join(visitados + (nome,))}")
+    caminho = PERFIS_DIR / f"{nome}.yaml"
+    if not caminho.exists():
+        log.warning("Perfil '%s' não existe em %s — usando só o perfil base "
+                    "(o domínio será induzido do corpus).", nome, PERFIS_DIR)
+        return {}
+    proprio = yaml.safe_load(caminho.read_text(encoding="utf-8")) or {}
+    pai = proprio.pop("herda", None)
+    if nome == "base" or not pai or pai == "base":
+        return proprio
+    return _fundir(_ler_perfil_yaml(str(pai), visitados + (nome,)), proprio)
+
+
 def carregar_perfil(nome: str) -> PerfilDominio:
-    """Carrega `perfis/<nome>.yaml` sobre `perfis/base.yaml`."""
+    """Carrega `perfis/<nome>.yaml` (e o que ele herda) sobre `perfis/base.yaml`."""
     dados: dict = {}
     base = PERFIS_DIR / "base.yaml"
     if base.exists():
         dados = yaml.safe_load(base.read_text(encoding="utf-8")) or {}
+        dados.pop("herda", None)
     if nome and nome != "base":
-        caminho = PERFIS_DIR / f"{nome}.yaml"
-        if not caminho.exists():
-            log.warning("Perfil '%s' não existe em %s — usando só o perfil base "
-                        "(o domínio será induzido do corpus).", nome, PERFIS_DIR)
-        else:
-            dados = _fundir(dados, yaml.safe_load(caminho.read_text(encoding="utf-8")) or {})
+        dados = _fundir(dados, _ler_perfil_yaml(nome))
     return PerfilDominio.de_dict(dados)
 
 

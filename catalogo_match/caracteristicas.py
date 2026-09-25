@@ -89,9 +89,9 @@ _PRIORIDADE = {"fracao": 0, "fracao_simples": 1, "prefixo": 2, "sufixo": 3}
 class _Padrao:
     """Uma forma de superficie de uma unidade, com o que fazer ao casar."""
 
-    __slots__ = ("regex", "base", "fator", "faixa", "inteiro", "tipo", "ordem")
+    __slots__ = ("regex", "base", "fator", "faixa", "inteiro", "tipo", "ordem", "alias")
 
-    def __init__(self, regex, base, fator, faixa, inteiro, tipo, ordem):
+    def __init__(self, regex, base, fator, faixa, inteiro, tipo, ordem, alias=""):
         self.regex = regex
         self.base = base
         self.fator = fator
@@ -99,6 +99,7 @@ class _Padrao:
         self.inteiro = inteiro
         self.tipo = tipo          # "sufixo" | "prefixo" | "fracao" | "fracao_simples"
         self.ordem = ordem        # (prioridade do tipo, -tamanho do alias)
+        self.alias = alias        # grafia de superficie que este padrao le
 
     def _valor(self, m) -> Optional[float]:
         if self.tipo == "fracao":
@@ -142,7 +143,7 @@ def padroes(perfil: Optional[PerfilDominio] = None) -> tuple:
             def novo(rx, tipo):
                 montados.append(_Padrao(
                     re.compile(rx, re.IGNORECASE), base, fator, faixa, inteiro,
-                    tipo, (_PRIORIDADE[tipo], -len(alias))))
+                    tipo, (_PRIORIDADE[tipo], -len(alias)), alias))
 
             novo(rf"(?<![A-Z]){{0}}({_NUM})\s*{a}{fim}".format(""), "sufixo")
             if spec.get("prefixo"):
@@ -153,7 +154,16 @@ def padroes(perfil: Optional[PerfilDominio] = None) -> tuple:
                 novo(rf"(\d+)\s+(\d+)\s*/\s*(\d+)\s*{a}{fim}", "fracao")
                 novo(rf"(\d+)\s*/\s*(\d+)\s*{a}{fim}", "fracao_simples")
 
-    saida = tuple(sorted(montados, key=lambda p: p.ordem))
+    # Desempate entre padroes do MESMO tipo e alias: o mais restrito (com
+    # `faixa`/`inteiro`) le antes do irrestrito. E o que permite "G" ser gauge
+    # E grama no mesmo perfil: "16 G" cai na faixa 5-34 e e lido como calibre;
+    # "500 G" e rejeitado pelo calibre e sobra para a massa. Sem isto a ordem
+    # de declaracao no YAML decidia, e a massa (declarada no perfil base, antes)
+    # engolia todos os calibres.
+    saida = tuple(sorted(
+        montados,
+        key=lambda p: (*p.ordem, 0 if (p.faixa or p.inteiro) else 1),
+    ))
     _CACHE_PADROES[chave] = saida
     if not saida:
         log.info("Perfil '%s' nao declara `aliases` em nenhuma unidade: a "
@@ -178,8 +188,59 @@ def _normalizar(texto: str) -> str:
 
     t = unicodedata.normalize("NFD", str(texto or ""))
     t = "".join(c for c in t if unicodedata.category(c) != "Mn").upper()
-    t = re.sub(r"[^\w\s,\.\-/\"]", " ", t)
+    # O "%" fica: concentracao ("SOLUCAO 0,9%") e medida tipada em farmacia e
+    # limpeza, e um perfil pode declara-lo como alias de unidade.
+    t = re.sub(r"[^\w\s,\.\-/\"%]", " ", t)
     return _RE_ESPACOS.sub(" ", t).strip()
+
+
+_CACHE_DIMENSOES: dict[int, Optional["re.Pattern"]] = {}
+
+
+def _re_dimensoes(pads: tuple) -> Optional["re.Pattern"]:
+    """
+    Cadeia de dimensoes com unidade so no fim: "210X86X162 CM", "5 X 10CM",
+    "1,20 X 0,80 M". Os aliases vem dos padroes de sufixo do perfil.
+    """
+    chave = id(pads)
+    if chave in _CACHE_DIMENSOES:
+        return _CACHE_DIMENSOES[chave]
+    # So aliases alfanumericos: a polegada como aspas ('3 1/2" X 5"') ja e lida
+    # pelo padrao de fracao, e "%" nao descreve dimensao.
+    alnum = sorted({p.alias.upper() for p in pads
+                    if p.tipo == "sufixo" and p.alias.isalnum()},
+                   key=len, reverse=True)
+    if not alnum:
+        _CACHE_DIMENSOES[chave] = None
+        return None
+    alternativas = "|".join(re.escape(a) for a in alnum)
+    rx = re.compile(
+        rf"(?<![A-Z0-9])({_NUM})((?:\s*X\s*{_NUM}){{1,2}})\s*({alternativas})(?![A-Z0-9])",
+        re.IGNORECASE,
+    )
+    _CACHE_DIMENSOES[chave] = rx
+    return rx
+
+
+def _expandir_dimensoes(t: str, pads: tuple) -> str:
+    """
+    "210,00X86,00X162,00CM" -> "210,00 CM X 86,00 CM X 162,00 CM".
+
+    Sem isto, a unidade so era lida no ultimo numero da cadeia — e nem nele
+    direito: com o "X" colado, a fronteira `(?<![A-Z])` cortava "162" em "62" e
+    a cama de 162 cm virava uma de 620 mm. Mobiliario, embalagem e tecido
+    descrevem quase toda medida assim; material hospitalar, quase nunca.
+    """
+    rx = _re_dimensoes(pads)
+    if rx is None:
+        return t
+
+    def _reescrever(m) -> str:
+        unidade = m.group(3)
+        numeros = [m.group(1)] + re.findall(_NUM, m.group(2))
+        return " X ".join(f"{n} {unidade}" for n in numeros)
+
+    return rx.sub(_reescrever, t)
 
 
 def extrair(texto: str, perfil: Optional[PerfilDominio] = None) -> dict[str, set]:
@@ -190,9 +251,10 @@ def extrair(texto: str, perfil: Optional[PerfilDominio] = None) -> dict[str, set
     consumido, na ordem de prioridade dos padroes, para que a mesma sequencia de
     digitos nao seja lida duas vezes com leituras incompativeis.
     """
-    t = _normalizar(texto)
+    pads = padroes(perfil)
+    t = _expandir_dimensoes(_normalizar(texto), pads)
     achadas: dict[str, set] = defaultdict(set)
-    for p in padroes(perfil):
+    for p in pads:
         consumir: list[tuple[int, int]] = []
         for m in p.regex.finditer(t):
             v = p._valor(m)

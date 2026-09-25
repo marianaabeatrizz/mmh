@@ -42,3 +42,9 @@ resultados/gpt-*/
 # A fila de curadoria JÁ REVISADA pelo especialista NÃO entra aqui:
 # dados/<dataset>/fila_curadoria_revisada.csv é entrada do pipeline e deve ser
 # versionada.
+
+# Diagnóstico por consulta (catalogo_match.diagnostico): um CSV de ~1 MB com o
+# texto integral de cada consulta e candidato, regenerável em segundos. Os
+# arquivos pequenos de movimento entre combinações (quem entrou/saiu do top-3)
+# e as varreduras de parâmetros ficam versionados como evidência.
+resultados/*/diagnostico/consultas_*.csv
