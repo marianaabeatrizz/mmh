@@ -1,0 +1,7 @@
+﻿posicao,combinacao,pre,proc,pos,n_avaliados,mrr,recall_at_1,recall_at_3,recall_at_5,recall_at_10,precisao_at_1,tempo_total_s
+1,nada + e5 + medidas_graphrag,nada,e5,medidas_graphrag,434,0.6987,0.5806,0.7719,0.8548,0.924,0.5806,251.62
+2,nada + e5 + unidades_graphrag,nada,e5,unidades_graphrag,434,0.6658,0.5369,0.7581,0.841,0.9124,0.5369,253.65
+3,nada + e5 + medidas_unidades,nada,e5,medidas_unidades,434,0.6828,0.5599,0.7581,0.8479,0.9194,0.5599,251.63
+4,nada + e5 + unidades,nada,e5,unidades,434,0.6671,0.5438,0.7419,0.8387,0.9147,0.5438,251.65
+5,nada + e5 + medidas,nada,e5,medidas,434,0.6746,0.5484,0.7419,0.8456,0.9194,0.5484,252.18
+6,nada + e5 + nada,nada,e5,nada,434,0.6536,0.5253,0.735,0.8341,0.9078,0.5253,251.58

@@ -1,5 +1,5 @@
 """
-rede_semantica_mmh.py
+rede_semantica.py
 Grafo lexico de dominio para CATMAT <-> e-Fisco.
 
 Baseado em: "Rede Semantica e Ontologia para o casamento CATMAT <-> e-Fisco"
@@ -48,7 +48,8 @@ import matplotlib.patches as mpatches
 import pandas as pd
 
 # Reutiliza funcoes de preprocessamento ja criadas
-from preprocessamento_mmh import (
+from .config import contexto, perfil_ativo
+from .preprocessamento import (
     carregar_dados,
     extrair_atributos_catmat,
     normalizar_texto,
@@ -59,17 +60,38 @@ from preprocessamento_mmh import (
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).parent
-DADOS_DIR = DATA_DIR / "dados"
-RESULTADOS_DIR = DATA_DIR / "resultados"
+BASE_DIR = Path(__file__).resolve().parent.parent
 HOJE = str(date.today())
 
-# Versao do lexico (sec. 3.6, "grafo lexico de dominio versionado"): entra no
-# grafo, no GraphML e na vista SKOS, para que cada release seja rastreavel.
-VERSAO_LEXICO = "2.0"
+# A versao do lexico (sec. 3.6, "grafo lexico de dominio versionado") e o
+# namespace da vista SKOS (sec. 3.5) sao do DOMINIO, e nao deste arquivo: vem do
+# perfil ativo. Datasets do mesmo dominio compartilham os dois.
 
-# Namespace da vista SKOS/RDF (sec. 3.5) — mesma base usada pela ontologia OWL.
-IRI_BASE = "http://mmh.sad.pe.gov.br/lexico"
+
+def versao_lexico() -> str:
+    return perfil_ativo().versao_lexico
+
+
+def iri_base() -> str:
+    """
+    Base dos IRIs da vista SKOS.
+
+    Sem `iri_lexico` no perfil, monta um IRI local com o nome do dataset em vez
+    de emitir RDF sob um dominio que nao e do projeto: publicar
+    `http://mmh.sad.pe.gov.br/...` para o catalogo de outro orgao seria afirmar
+    uma autoria que nao existe.
+    """
+    perfil = perfil_ativo()
+    if perfil.iri_lexico:
+        return perfil.iri_lexico
+    return f"http://localhost/{contexto().dataset.nome}/lexico"
+
+
+def dir_resultados() -> Path:
+    """Pasta de saida do dataset ativo (resultados/<dataset>/)."""
+    d = contexto().dataset.dir_resultados
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 # ---------------------------------------------------------------------------
 # Constantes do esquema (sec. 3.5)
@@ -106,106 +128,13 @@ ESTILO_ARESTA = {
 }
 
 # ---------------------------------------------------------------------------
-# Abreviacoes curadas do dominio de compras (secao 3.6-c)
+# Lexico curado e tabela de unidades: do perfil, nao daqui (secoes 3.6-c e 3.6-f)
 # ---------------------------------------------------------------------------
-
-ABREVIACOES_CURADAS = {
-    # conectores e preposicoes
-    "C/":    "COM",
-    "P/":    "PARA",
-    "S/":    "SEM",
-    # unidades de embalagem
-    "CX":    "CAIXA",
-    "PCT":   "PACOTE",
-    "FR":    "FRASCO",
-    "AMP":   "AMPOLA",
-    "ENV":   "ENVELOPE",
-    "RL":    "ROLO",
-    "PC":    "PECA",
-    "PR":    "PAR",
-    "KIT":   "KIT",
-    "UND":   "UNIDADE",
-    "UN":    "UNIDADE",
-    # adjetivos comuns
-    "DESC":  "DESCARTAVEL",
-    "ESTER": "ESTERIL",
-    "INOX":  "ACO INOXIDAVEL",
-    "PVC":   "CLORETO DE POLIVINILA",
-    # gauge / calibre
-    "GA":    "GAUGE",
-    # referencias tecnicas residuais
-    "LUER":  "LUER LOCK",
-}
-
-# Variantes ortograficas observadas nos dados (secao 3.6-b/c)
-VARIANTES_ORTOGRAFICAS = {
-    "QUICKLE":    "QUINCKE",
-    "QUINKER":    "QUINCKE",
-    "TOUHY":      "TUOHY",
-    "ESTERILIZADOR": "ESTERILIZACAO",
-    "BIOPCIA":    "BIOPSIA",
-    "ESPESSURA":  "ESPESSURA",
-    "ANASTESIA":  "ANESTESIA",
-}
-
-# Sinonimos de dominio curados
-SINONIMOS_CURADOS = {
-    "AGULHA PARA PUNCAO": "AGULHA PUNCAO",
-    "BISEL":              "BISEL CORTANTE",
-    "CANHAO":             "CONECTOR",
-    "TUBO":               "CANULA",
-    "SERINGA":            "DISPOSITIVO INFUSAO",
-}
-
-# Hierarquias (hiperonimo -> lista de hiponimos)
-HIERARQUIA_CURADA = {
-    "AGULHA": [
-        "AGULHA PUNCAO OSSEA",
-        "AGULHA BIOPSIA",
-        "AGULHA ANESTESIA RAQUIDIANA",
-        "DISPOSITIVO P ANESTESIA REGIONAL",
-        "AGULHA PERIDURAL",
-    ],
-    "DISPOSITIVO MEDICO": [
-        "AGULHA",
-        "FIO DE SUTURA AGULHADO",
-        "DISPOSITIVO PORTÁTIL PARA TERAPIA RESPIRATORIA",
-        "TUBO HOSPITALAR",
-    ],
-    "AGULHA ANESTESIA": [
-        "AGULHA ANESTESIA RAQUIDIANA",
-        "DISPOSITIVO P ANESTESIA REGIONAL",
-    ],
-}
-
-# ---------------------------------------------------------------------------
-# Tabela de unidades (secao 3.6-f)
-# ---------------------------------------------------------------------------
-
-UNIDADES = {
-    # comprimento
-    "MM":   {"categoria": "comprimento", "base": "MM"},
-    "CM":   {"categoria": "comprimento", "base": "MM", "fator_para_base": 10.0},
-    "M":    {"categoria": "comprimento", "base": "MM", "fator_para_base": 1000.0},
-    # volume
-    "ML":   {"categoria": "volume", "base": "ML"},
-    "L":    {"categoria": "volume", "base": "ML", "fator_para_base": 1000.0},
-    # massa
-    "G":    {"categoria": "massa", "base": "G"},
-    "KG":   {"categoria": "massa", "base": "G", "fator_para_base": 1000.0},
-    "MG":   {"categoria": "massa", "base": "G", "fator_para_base": 0.001},
-    # contagem
-    "UNIDADE": {"categoria": "contagem", "base": "UNIDADE"},
-    "DUZIA":   {"categoria": "contagem", "base": "UNIDADE", "fator_para_base": 12.0},
-    "CENTO":   {"categoria": "contagem", "base": "UNIDADE", "fator_para_base": 100.0},
-    # calibre
-    "G_GAUGE": {"categoria": "calibre",  "base": "G_GAUGE"},   # gauge medico
-    "FR":      {"categoria": "calibre",  "base": "FR"},         # french/charriere
-    # embalagem
-    "CAIXA":   {"categoria": "embalagem", "base": "CAIXA"},
-    "PACOTE":  {"categoria": "embalagem", "base": "PACOTE"},
-    "ROLO":    {"categoria": "embalagem", "base": "ROLO"},
-}
+# Este arquivo tinha cinco dicionarios de dominio: abreviacoes, variantes
+# ortograficas, sinonimos, hierarquia e unidades. Estao em
+# config/perfis/<dominio>.yaml e chegam por `perfil_ativo()`. O que sobrou aqui
+# e o ALGORITMO: como a semente curada entra no grafo, como a inducao propoe
+# vizinhos, como a ativacao se propaga.
 
 # ---------------------------------------------------------------------------
 # Construcao do grafo
@@ -432,40 +361,45 @@ def _construir_lexical_curado(G: nx.DiGraph) -> None:
     """
     Secao 3.6-c: abreviacoes/siglas do dominio de compras (curadas manualmente).
     Peso menor que a verteba, pois sao genericas.
+
+    A semente vem do perfil ativo. Perfil sem semente (dominio novo) nao quebra:
+    o grafo fica so com a verteba estrutural (a), o jargao minerado do historico
+    (b) e a inducao por embeddings (d) -- menos preciso, e honesto quanto a isso.
     """
     log.info("(c) Inserindo semente lexical curada...")
+    perfil = perfil_ativo()
 
     # Abreviacoes
-    for abrev, forma_longa in ABREVIACOES_CURADAS.items():
+    for abrev, forma_longa in perfil.abreviacoes.items():
         nid_t = _add_no(G, "Termo", abrev)
         nid_c = _add_no(G, "Conceito", forma_longa)
         _add_aresta(G, nid_t, nid_c, "abreviacaoDe", peso=0.95, fonte="curado")
         _add_aresta(G, nid_t, nid_c, "formaCanonicaDe", peso=0.95, fonte="curado")
 
     # Variantes ortograficas
-    for variante, canonica in VARIANTES_ORTOGRAFICAS.items():
+    for variante, canonica in perfil.variantes.items():
         nid_t = _add_no(G, "Termo", variante)
         nid_c = _add_no(G, "Conceito", canonica)
         _add_aresta(G, nid_t, nid_c, "varianteOrtograficaDe", peso=0.9, fonte="curado")
         _add_aresta(G, nid_t, nid_c, "formaCanonicaDe", peso=0.9, fonte="curado")
 
     # Sinonimos curados
-    for termo, sinonimo in SINONIMOS_CURADOS.items():
+    for termo, sinonimo in perfil.sinonimos.items():
         nid_a = _add_no(G, "Conceito", termo)
         nid_b = _add_no(G, "Conceito", sinonimo)
         _add_aresta(G, nid_a, nid_b, "sinonimoDe", peso=0.9, fonte="curado")
         _add_aresta(G, nid_b, nid_a, "sinonimoDe", peso=0.9, fonte="curado")
 
     # Hierarquias curadas
-    for hiper, hipos in HIERARQUIA_CURADA.items():
+    for hiper, hipos in perfil.hierarquia.items():
         nid_hiper = _add_no(G, "Conceito", hiper)
         for hipo in hipos:
             nid_hipo = _add_no(G, "Conceito", hipo)
             _add_aresta(G, nid_hipo, nid_hiper, "hiperonimoDe", peso=0.85, fonte="curado")
 
     log.info("  -> semente lexical curada inserida (%d abrev., %d variantes, %d sinonimos, %d hierarquias)",
-             len(ABREVIACOES_CURADAS), len(VARIANTES_ORTOGRAFICAS),
-             len(SINONIMOS_CURADOS), sum(len(v) for v in HIERARQUIA_CURADA.values()))
+             len(perfil.abreviacoes), len(perfil.variantes),
+             len(perfil.sinonimos), sum(len(v) for v in perfil.hierarquia.values()))
 
 
 # ---- (d) Inducao por embeddings ---------------------------------------------
@@ -605,7 +539,7 @@ def exportar_fila_curadoria(G: nx.MultiDiGraph,
                             destino: Optional[Path] = None,
                             limite: int = 200) -> Path:
     """Grava a fila de curadoria em CSV para o especialista trabalhar nela."""
-    destino = destino or (RESULTADOS_DIR / "fila_curadoria.csv")
+    destino = destino or (dir_resultados() / "fila_curadoria.csv")
     fila = fila_curadoria(G, limite=limite)
     df_fila = pd.DataFrame(fila)
     # Coluna em branco onde o especialista escreve o veredito.
@@ -669,9 +603,10 @@ def _construir_unidades(G: nx.DiGraph) -> None:
     Secao 3.6-f: tabela de Unidade + convertePara.
     """
     log.info("(f) Inserindo tabela de unidades...")
+    unidades = perfil_ativo().unidades
     nos_unidade: dict[str, str] = {}
 
-    for nome, props in UNIDADES.items():
+    for nome, props in unidades.items():
         nid = _add_no(G, "Unidade", nome,
                       categoria=props["categoria"],
                       base=props["base"],
@@ -680,14 +615,14 @@ def _construir_unidades(G: nx.DiGraph) -> None:
 
     # Arestas convertePara para unidades da mesma categoria
     por_categoria: dict[str, list] = defaultdict(list)
-    for nome, props in UNIDADES.items():
+    for nome, props in unidades.items():
         por_categoria[props["categoria"]].append(nome)
 
     for cat, nomes in por_categoria.items():
         for i, n1 in enumerate(nomes):
             for n2 in nomes[i+1:]:
-                f1 = UNIDADES[n1].get("fator_para_base", 1.0)
-                f2 = UNIDADES[n2].get("fator_para_base", 1.0)
+                f1 = unidades[n1].get("fator_para_base", 1.0)
+                f2 = unidades[n2].get("fator_para_base", 1.0)
                 fator = f1 / f2
                 _add_aresta(G, nos_unidade[n1], nos_unidade[n2],
                             "convertePara", peso=1.0, fonte="curado",
@@ -705,17 +640,31 @@ def _tokens_limpos(texto: str) -> list[str]:
     return [tk for tk in remover_stopwords(toks) if len(tk) > 2]
 
 
-_RE_DIM = re.compile(r"\b\d[\d\.,]*\s*(?:MM|CM|M|ML|L|G|KG|MG|G_GAUGE|FR)\b", re.IGNORECASE)
 _RE_NUM = re.compile(r"\b\d[\d\.,]*\b")
+_CACHE_RE_DIM: dict[int, "re.Pattern"] = {}
+
+
+def _re_dimensao() -> "re.Pattern":
+    """
+    Numero seguido de unidade. A lista de unidades sai da tabela do perfil, e
+    nao de um literal aqui: era ela que amarrava este arquivo a gauge e french.
+    """
+    unidades = perfil_ativo().unidades
+    chave = id(unidades)
+    if chave not in _CACHE_RE_DIM:
+        alt = "|".join(re.escape(u) for u in sorted(unidades, key=len, reverse=True)) or "MM"
+        _CACHE_RE_DIM[chave] = re.compile(
+            r"\b\d[\d\.,]*\s*(?:" + alt + r")\b", re.IGNORECASE)
+    return _CACHE_RE_DIM[chave]
 
 
 def _e_valor_numerico(texto: str) -> bool:
-    return bool(_RE_DIM.search(texto) or _RE_NUM.search(texto))
+    return bool(_re_dimensao().search(texto) or _RE_NUM.search(texto))
 
 
 def _associar_unidade(G: nx.DiGraph, nid_val: str, texto: str) -> None:
     """Liga ValorDeAtributo a Unidade via temUnidade."""
-    for nome_unidade in UNIDADES:
+    for nome_unidade in perfil_ativo().unidades:
         if re.search(r"\b" + nome_unidade + r"\b", texto, re.IGNORECASE):
             nid_u = _id_no("Unidade", nome_unidade)
             if nid_u in G:
@@ -728,7 +677,7 @@ def _associar_unidade(G: nx.DiGraph, nid_val: str, texto: str) -> None:
 # Funcao principal de construcao
 # ---------------------------------------------------------------------------
 
-def construir_grafo(arquivo: str = "principal", inducao: bool = True) -> nx.MultiDiGraph:
+def construir_grafo(arquivo: str = "", inducao: bool = True) -> nx.MultiDiGraph:
     """
     Executa o pipeline completo da Secao 3.6 e retorna o grafo.
 
@@ -747,9 +696,12 @@ def construir_grafo(arquivo: str = "principal", inducao: bool = True) -> nx.Mult
         nx.MultiDiGraph com nos e arestas tipados conforme sec. 3.5.
     """
     df = carregar_dados(arquivo)
+    ds = contexto().dataset
     G = nx.MultiDiGraph(
-        nome="Rede Semantica CATMAT<->eFisco",
-        versao=VERSAO_LEXICO,
+        nome=f"Rede Semantica CATMAT<->eFisco ({ds.nome})",
+        dataset=ds.nome,
+        dominio=perfil_ativo().nome,
+        versao=versao_lexico(),
         data=HOJE,
     )
 
@@ -761,7 +713,7 @@ def construir_grafo(arquivo: str = "principal", inducao: bool = True) -> nx.Mult
     _construir_unidades(G)
 
     # (e) Reaplica vereditos de curadoria de rodadas anteriores, se houver.
-    aplicar_curadoria(G, DATA_DIR / "fila_curadoria_revisada.csv")
+    aplicar_curadoria(G, contexto().dataset.arquivo_curadoria)
 
     log.info("Grafo construido: %d nos | %d arestas", G.number_of_nodes(), G.number_of_edges())
     _resumir_grafo(G)
@@ -1157,7 +1109,7 @@ def visualizar_grafo(
     ax.set_title(titulo, color="white", fontsize=13, pad=12)
     ax.axis("off")
 
-    destino = salvar_em or RESULTADOS_DIR / "rede_semantica.png"
+    destino = salvar_em or dir_resultados() / "rede_semantica.png"
     plt.tight_layout()
     plt.savefig(destino, dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.close()
@@ -1166,7 +1118,7 @@ def visualizar_grafo(
 
 def exportar_graphml(G: nx.MultiDiGraph, destino: Optional[Path] = None) -> Path:
     """Exporta o grafo em GraphML para importacao no Neo4j / Gephi."""
-    destino = destino or RESULTADOS_DIR / "rede_semantica.graphml"
+    destino = destino or dir_resultados() / "rede_semantica.graphml"
     # GraphML nao suporta dict como atributo de no; converte para str se necessario
     G_export = G.copy()
     for n, d in G_export.nodes(data=True):
@@ -1210,23 +1162,23 @@ def exportar_skos(G: nx.MultiDiGraph, destino: Optional[Path] = None) -> Optiona
         log.warning("rdflib ausente — vista SKOS nao exportada.")
         return None
 
-    destino = destino or RESULTADOS_DIR / "rede_semantica_skos.ttl"
-    MMH = Namespace(f"{IRI_BASE}#")
+    destino = destino or dir_resultados() / "rede_semantica_skos.ttl"
+    DOM = Namespace(f"{iri_base()}#")
 
     g = RDFGraph()
     g.bind("skos", SKOS)
-    g.bind("mmh", MMH)
+    g.bind(perfil_ativo().prefixo, DOM)
     g.bind("dcterms", DCTERMS)
 
-    esquema = URIRef(f"{IRI_BASE}#esquema")
+    esquema = URIRef(f"{iri_base()}#esquema")
     g.add((esquema, RDF.type, SKOS.ConceptScheme))
     g.add((esquema, SKOS.prefLabel, Literal("Lexico de dominio CATMAT <-> e-Fisco", lang="pt")))
-    g.add((esquema, DCTERMS.hasVersion, Literal(VERSAO_LEXICO)))
+    g.add((esquema, DCTERMS.hasVersion, Literal(versao_lexico())))
     g.add((esquema, DCTERMS.date, Literal(HOJE, datatype=XSD.date)))
 
     def _uri(nid: str) -> URIRef:
         # ID do no ja e seguro para IRI (TIPO::TEXTO_NORMALIZADO).
-        return URIRef(f"{IRI_BASE}#{nid.replace('::', '.')}")
+        return URIRef(f"{iri_base()}#{nid.replace('::', '.')}")
 
     # Conceitos e PDMs viram skos:Concept.
     for nid, dados in G.nodes(data=True):
@@ -1237,7 +1189,7 @@ def exportar_skos(G: nx.MultiDiGraph, destino: Optional[Path] = None) -> Optiona
         g.add((uri, RDF.type, SKOS.Concept))
         g.add((uri, SKOS.inScheme, esquema))
         g.add((uri, SKOS.prefLabel, Literal(dados.get("label", ""), lang="pt")))
-        g.add((uri, MMH.tipoNo, Literal(tipo)))
+        g.add((uri, DOM.tipoNo, Literal(tipo)))
         if tipo == "PDM":
             g.add((uri, SKOS.topConceptOf, esquema))
             g.add((esquema, SKOS.hasTopConcept, uri))
@@ -1280,17 +1232,54 @@ def exportar_skos(G: nx.MultiDiGraph, destino: Optional[Path] = None) -> Optiona
 # Execucao direta
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    # Constroi o grafo completo
-    G = construir_grafo("principal")
+def pdm_mais_frequente(G: "nx.MultiDiGraph") -> str:
+    """
+    PDM de maior frequencia no grafo — o foco padrao da visualizacao.
+
+    Substitui o "AGULHA PUNCAO OSSEA" que estava fixo aqui: para um dataset
+    qualquer, o PDM mais frequente e o que melhor mostra como a vizinhanca do
+    grafo se parece. O perfil pode fixar outro em `lexico.pdm_foco_exemplo`.
+    """
+    candidatos = [(d.get("frequencia", 0), d.get("label", ""))
+                  for _, d in G.nodes(data=True) if d.get("tipo") == "PDM"]
+    if not candidatos:
+        return ""
+    return max(candidatos, key=lambda par: (par[0], par[1]))[1]
+
+
+def _cli() -> None:
+    import argparse
+
+    from .config import ativar, listar_datasets
+
+    ap = argparse.ArgumentParser(
+        description="Constroi o grafo lexico de dominio, visualiza e exporta.")
+    ap.add_argument("--dataset", default="",
+                    help=f"dataset a usar. Disponiveis: {', '.join(listar_datasets())}")
+    ap.add_argument("--arquivo", default="", help="chave logica do arquivo no dataset")
+    ap.add_argument("--perfil", default="", help="forca outro perfil de dominio")
+    ap.add_argument("--sem-inducao", action="store_true",
+                    help="desliga a etapa (d) de inducao por embeddings (mais rapido)")
+    ap.add_argument("--foco", default="",
+                    help="PDM da visualizacao de vizinhanca (padrao: o mais frequente)")
+    args = ap.parse_args()
+
+    ativar(args.dataset, perfil=args.perfil)
+    perfil = perfil_ativo()
+    saida = dir_resultados()
+
+    G = construir_grafo(args.arquivo, inducao=not args.sem_inducao)
 
     # Visualizacao 1: vizinhanca de um PDM especifico
-    visualizar_grafo(
-        G,
-        pdm_foco="AGULHA PUNCAO OSSEA",
-        titulo="Vizinhanca: AGULHA PUNCAO OSSEA",
-        salvar_em=DATA_DIR / "rede_semantica_agulha.png",
-    )
+    foco = args.foco or perfil.pdm_foco_exemplo or pdm_mais_frequente(G)
+    if foco:
+        from .config import sanitizar
+        visualizar_grafo(
+            G,
+            pdm_foco=foco,
+            titulo=f"Vizinhanca: {foco}",
+            salvar_em=saida / f"rede_semantica_{sanitizar(foco)[:30].lower()}.png",
+        )
 
     # Visualizacao 2: top nos do grafo completo
     visualizar_grafo(
@@ -1298,7 +1287,7 @@ if __name__ == "__main__":
         pdm_foco=None,
         max_nos=80,
         titulo="Rede Semantica CATMAT <-> e-Fisco (top 80 nos por grau)",
-        salvar_em=DATA_DIR / "rede_semantica_geral.png",
+        salvar_em=saida / "rede_semantica_geral.png",
     )
 
     # Exporta GraphML para Neo4j/Gephi
@@ -1306,11 +1295,16 @@ if __name__ == "__main__":
 
     # Demonstracao do servico de consulta (sec. 3.7)
     print("\n=== Servico de consulta (sec. 3.7) ===")
-    exemplos = ["INOX", "QUICKLE", "C/", "UND", "ESTERIL"]
+    exemplos = list(perfil.exemplos_demo) or sorted(perfil.abreviacoes)[:5]
     for t in exemplos:
         print(f"  normalizar('{t}') -> '{normalizar_termo(G, t)}'")
 
-    print("\n  expansao por spreading activation a partir de ['AGULHA PUNCAO OSSEA']:")
-    ativ = expandir_por_ativacao(G, ["AGULHA PUNCAO OSSEA"], limiar=0.1)
-    for label, score in sorted(ativ.items(), key=lambda x: -x[1])[:8]:
-        print(f"    {label}: {score:.3f}")
+    if foco:
+        print(f"\n  expansao por spreading activation a partir de ['{foco}']:")
+        ativ = expandir_por_ativacao(G, [foco], limiar=0.1)
+        for label, score in sorted(ativ.items(), key=lambda x: -x[1])[:8]:
+            print(f"    {label}: {score:.3f}")
+
+
+if __name__ == "__main__":
+    _cli()

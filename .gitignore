@@ -3,12 +3,15 @@
 .env.*
 *.key
 
-# Caches de chamadas LLM (contêm texto do domínio; regeneráveis)
+# Caches por dataset: chamadas LLM, embeddings da grade e expansão GraphRAG.
+# Contêm texto do domínio e são regeneráveis; o código que os produz é versionado.
+cache/
+
+# Caches antigos, da época em que ficavam na raiz do repositório (mantidos aqui
+# para não reaparecerem num `git add .` de quem atualizou o clone sem limpar).
 cache_extracao_llm.json
 cache_graphrag_llm.json
 cache_graphrag_expansao.json
-
-# Cache de embeddings/scores da grade modular (~6 MB por combinação; regenerável)
 cache_embeddings/
 
 # Artefatos pesados/gerados
@@ -19,15 +22,23 @@ RECUPERADO_*
 
 # Saídas regeneráveis do pipeline (o código que as produz está versionado)
 run_*.log
+resultados/*/*_preprocessado.csv
+resultados/*/rede_semantica_skos.ttl
+resultados/*/ontologia.owl
+resultados/*/fila_curadoria.csv
 rede_semantica_skos.ttl
 ontologia_mmh.owl
 fila_curadoria.csv
 
-# Workspace do Microsoft GraphRAG (648 MB de artefatos gerados na indexação)
+# Workspace do Microsoft GraphRAG (centenas de MB de artefatos de indexação,
+# agora com um subdiretório por dataset)
 graphrag_workspace/
 
-# Subdiretórios de runs por modelo (resultados documentados em RESULTADOS.md)
+# Subdiretórios de runs por modelo de LLM (resultados documentados em
+# RESULTADOS.md); `--model` escreve em resultados/<dataset>/<modelo>/
+resultados/*/gpt-*/
 resultados/gpt-*/
 
-# Fila de curadoria JÁ REVISADA pelo especialista NÃO entra aqui:
-# fila_curadoria_revisada.csv é entrada do pipeline e deve ser versionada.
+# A fila de curadoria JÁ REVISADA pelo especialista NÃO entra aqui:
+# dados/<dataset>/fila_curadoria_revisada.csv é entrada do pipeline e deve ser
+# versionada.

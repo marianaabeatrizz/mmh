@@ -1,0 +1,185 @@
+# Perfil base — o que vale para QUALQUER domínio de catálogo de compras.
+#
+# Todo perfil é carregado sobre este (merge recursivo, o específico vence). O que
+# está aqui não é conhecimento de domínio: é português, é o Sistema Internacional
+# e é o formato de rótulo do CATMAT. Nada aqui menciona agulha, seringa ou
+# medicamento.
+#
+# Um dataset SEM perfil próprio roda só com este arquivo + indução do corpus
+# (catalogo_match/config.py: induzir_perfil). Funciona; rende menos que um perfil
+# curado, e o YAML de resultados registra quanto de cada.
+
+nome: base
+descricao: itens de catálogo de compras públicas
+prefixo: dom
+
+# IRIs deixados em branco de propósito: quem roda sem perfil não deve publicar
+# ontologia sob um IRI que finge ser de alguém. `ontologia_owl.py` monta um IRI
+# local a partir do nome do dataset quando este campo está vazio.
+iri_ontologia: ""
+iri_lexico: ""
+versao_lexico: '1.0'
+
+# Papéis dos prompts: deixados vazios para que `perfil.papel()` os monte a partir
+# de `descricao`. Um perfil de domínio sobrescreve com a frase que quiser.
+llm: {}
+
+texto:
+  # Boilerplate NÃO tem padrão universal — cláusula legal é específica do órgão e
+  # do domínio. Vazio aqui significa: ou o perfil declara, ou a indução extrai as
+  # frases que o corpus repete em >= 40% dos registros.
+  boilerplate: []
+
+  # Stopwords do português, sem resíduo de domínio (o MMH acrescenta "produto",
+  # "embalagem" etc. no perfil dele).
+  stopwords:
+  - a
+  - ao
+  - aos
+  - as
+  - com
+  - da
+  - das
+  - de
+  - do
+  - dos
+  - e
+  - em
+  - na
+  - nas
+  - no
+  - nos
+  - o
+  - os
+  - ou
+  - para
+  - por
+  - se
+  - um
+  - uma
+  - umas
+  - uns
+
+  sinonimos_regex: {}
+
+lexico:
+  # Abreviações de uso geral em texto de compras — unidade de embalagem e
+  # preposição abreviada aparecem em qualquer catálogo, de parafuso a reagente.
+  abreviacoes:
+    C/: COM
+    P/: PARA
+    S/: SEM
+    CX: CAIXA
+    PCT: PACOTE
+    UND: UNIDADE
+    UN: UNIDADE
+    PC: PECA
+    PR: PAR
+    RL: ROLO
+  variantes: {}
+  sinonimos: {}
+  hierarquia: {}
+  pdm_foco_exemplo: ""
+  exemplos_demo: []
+
+# Unidades do SI e de contagem, com fator de conversão verificável. Unidade de
+# domínio (gauge, french, UI) é do perfil do domínio, não daqui.
+#
+# `aliases` são as grafias que o extrator de características procura no texto
+# livre (ver catalogo_match/caracteristicas.py). Só comprimento e volume as
+# recebem aqui, porque são inequívocas em qualquer catálogo. Massa fica sem
+# aliases de propósito: em catálogo médico "G" é gauge, não grama, e um alias
+# errado inventa medida onde não há. Domínio que precise de massa declara no
+# próprio perfil.
+unidades:
+  MM:
+    categoria: comprimento
+    base: MM
+    aliases: [MM, MILIMETRO, MILIMETROS]
+  CM:
+    categoria: comprimento
+    base: MM
+    fator_para_base: 10.0
+    aliases: [CM, CENTIMETRO, CENTIMETROS]
+  M:
+    categoria: comprimento
+    base: MM
+    fator_para_base: 1000.0
+    aliases: [M, METRO, METROS]
+  ML:
+    categoria: volume
+    base: ML
+    aliases: [ML, MILILITRO, MILILITROS]
+  L:
+    categoria: volume
+    base: ML
+    fator_para_base: 1000.0
+    aliases: [L, LITRO, LITROS]
+  G:
+    categoria: massa
+    base: G
+  KG:
+    categoria: massa
+    base: G
+    fator_para_base: 1000.0
+  MG:
+    categoria: massa
+    base: G
+    fator_para_base: 0.001
+  UNIDADE:
+    categoria: contagem
+    base: UNIDADE
+  DUZIA:
+    categoria: contagem
+    base: UNIDADE
+    fator_para_base: 12.0
+  CENTO:
+    categoria: contagem
+    base: UNIDADE
+    fator_para_base: 100.0
+  CAIXA:
+    categoria: embalagem
+    base: CAIXA
+  PACOTE:
+    categoria: embalagem
+    base: PACOTE
+  ROLO:
+    categoria: embalagem
+    base: ROLO
+
+# Famílias, esquema de atributos e definidoras são sempre do domínio: vazios aqui,
+# induzidos do corpus quando o perfil não os traz.
+familias: []
+atributos: {}
+atributos_definidores: {}
+extracao: []
+
+entidades:
+  # Tokens que não discriminam item nenhum em texto de compras públicas.
+  stopwords:
+  - ACORDO
+  - CADA
+  - COM
+  - COMO
+  - CONFORME
+  - DADOS
+  - DEMAIS
+  - DEVE
+  - DEVERA
+  - EMBALADO
+  - EMBALAGEM
+  - ESSA
+  - ESTE
+  - ITEM
+  - OUTROS
+  - PARA
+  - PRODUTO
+  - SEM
+  - TIPO
+  - UNIDADE
+  max_itens_por_entidade: 200
+
+medidas:
+  # Sem `regex`, `medidas_de()` monta o padrão a partir da tabela de unidades em
+  # uso (inclusive as induzidas). Sem `regex_calibre`, não há sinal de calibre.
+  rotulo_calibre: CALIBRE

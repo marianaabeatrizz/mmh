@@ -1,6 +1,6 @@
 """
-pipeline_completo_mmh.py
-========================
+pipeline.py
+===========
 Implementação integral do fluxo fim a fim descrito em:
   "Rede Semântica e Ontologia para o casamento CATMAT <-> e-Fisco"
   Seção 4.3 — Fases [0] a [9]
@@ -30,11 +30,20 @@ Agora a fase [3] gera candidatos de verdade a partir do catálogo inteiro, e as
 fases [4]–[8] operam sobre esses candidatos. O gabarito passa a ser usado só
 para AVALIAR, nunca para construir o conjunto avaliado.
 
+MULTI-DATASET
+-------------
+Nenhuma fase conhece o domínio: o que é conhecimento (léxico, famílias,
+unidades, esquema de atributos, papéis nos prompts) vem do PERFIL, e o que é
+corpus (arquivos, separador, saídas) vem do DATASET. Ver catalogo_match/config.py
+e config/{datasets,perfis}/.
+
 Uso:
-    python pipeline_completo_mmh.py            # pipeline completo
-    python pipeline_completo_mmh.py --smoke    # testa a conexão com a LLM
-    python pipeline_completo_mmh.py --sem-llm  # força o caminho offline (regex)
-    python pipeline_completo_mmh.py --sem-rede # ablação §3.10: desliga a fase [1]
+    python -m catalogo_match.pipeline                       # dataset padrão
+    python -m catalogo_match.pipeline --dataset mmh_opme    # outro corpus
+    python -m catalogo_match.pipeline --perfil base         # sem léxico curado
+    python -m catalogo_match.pipeline --smoke               # testa a conexão
+    python -m catalogo_match.pipeline --sem-llm             # offline (regex do perfil)
+    python -m catalogo_match.pipeline --sem-rede            # ablação §3.10
 """
 
 import re
@@ -67,9 +76,9 @@ from rdflib import Graph, Namespace, RDF, Literal, BNode
 from rdflib.namespace import SH
 import pyshacl
 
-# Módulos locais do projeto MMH
-sys.path.insert(0, str(Path(__file__).parent))
-from preprocessamento_mmh import (
+# Módulos locais do projeto
+from .config import contexto, perfil_ativo
+from .preprocessamento import (
     carregar_dados,
     normalizar_texto,
     preprocessar_texto_efisco,
@@ -78,7 +87,7 @@ from preprocessamento_mmh import (
     tokenizar,
     remover_stopwords,
 )
-from rede_semantica_mmh import (
+from .rede_semantica import (
     construir_grafo,
     normalizar_termo,
     expandir_por_ativacao,
@@ -88,16 +97,14 @@ from rede_semantica_mmh import (
     exportar_skos,
     exportar_fila_curadoria,
     visualizar_grafo,
-    HIERARQUIA_CURADA,
-    DATA_DIR,
-    DADOS_DIR,
-    RESULTADOS_DIR,
+    pdm_mais_frequente,
+    dir_resultados,
     _id_no,
     HOJE,
 )
-from ontologia_owl_mmh import (
-    CARACTERISTICAS_DEFINIDORAS,
-    IRI_ONTOLOGIA,
+from .ontologia_owl import (
+    caracteristicas_definidoras,
+    iri_ontologia,
     _familia_de,
 )
 
@@ -167,15 +174,31 @@ PESOS_SCORE_FINAL = {
     "graphrag":  0.20,
 }
 
-# Chaves canônicas do esquema PDM
-_ATRIBUTOS_PDM_KEYS = (
-    "calibre", "comprimento_valor", "comprimento_unidade",
-    "volume_valor", "volume_unidade", "dimensao",
-    "conector", "esterilidade", "material", "bisel", "modelo",
-)
+# Chaves canônicas do esquema de atributos: são as do PERFIL de domínio. Eram
+# uma tupla literal aqui (calibre, bisel, conector...), o que amarrava o esquema
+# a material médico-hospitalar.
 
-_CACHE_EXTRACAO_PATH = "cache_extracao_llm.json"
-_CACHE_GRAPHRAG_PATH = "cache_graphrag_llm.json"
+
+def atributos_pdm_keys() -> tuple[str, ...]:
+    return perfil_ativo().chaves_atributos
+
+
+# Caches de LLM por dataset: o conteúdo é o texto do corpus, e misturar corpora
+# no mesmo arquivo só cria confusão na hora de invalidar.
+
+
+def _cache_path(nome: str) -> str:
+    d = contexto().dataset.dir_cache
+    d.mkdir(parents=True, exist_ok=True)
+    return str(d / nome)
+
+
+def cache_extracao_path() -> str:
+    return _cache_path("extracao_llm.json")
+
+
+def cache_graphrag_path() -> str:
+    return _cache_path("graphrag_llm.json")
 
 # Teto de chamadas LLM por execução na fase [6] (custo previsível)
 LLM_MAX_ADJUDICACOES = 500
@@ -222,7 +245,7 @@ def _hash_texto(texto: str) -> str:
     return hashlib.sha1(base.encode("utf-8")).hexdigest()
 
 
-def _carregar_cache_extracao(caminho: str = _CACHE_EXTRACAO_PATH) -> dict:
+def _carregar_cache_extracao(caminho: str = "") -> dict:
     if os.path.exists(caminho):
         try:
             with open(caminho, "r", encoding="utf-8") as fh:
@@ -232,7 +255,7 @@ def _carregar_cache_extracao(caminho: str = _CACHE_EXTRACAO_PATH) -> dict:
     return {}
 
 
-def _salvar_cache_extracao(cache: dict, caminho: str = _CACHE_EXTRACAO_PATH) -> None:
+def _salvar_cache_extracao(cache: dict, caminho: str = "") -> None:
     try:
         with open(caminho, "w", encoding="utf-8") as fh:
             json.dump(cache, fh, ensure_ascii=False, indent=0)
@@ -287,21 +310,27 @@ def fase_0_fontes() -> dict:
     log.info("[0] FONTES — Ingestão, catálogo e consultas")
     log.info("=" * 68)
 
+    ctx = contexto()
     dfs = {}
-    for nome, arq in {
-        "principal": "20260408_ground_truth_mmh_limpa.csv",
-        "test":      "20260408_ground_truth_mmh_test.csv",
-        "opme_test": "20260408_ground_truth_mmh_opme_test.csv",
-    }.items():
-        caminho = DADOS_DIR / arq
+    for nome in ctx.dataset.arquivos:
+        caminho = ctx.dataset.caminho(nome)
         if caminho.exists():
-            d = pd.read_csv(caminho, sep="|", dtype=str, encoding="utf-8-sig")
-            d.columns = d.columns.str.strip()
+            d = ctx.dataset.ler(nome)
             d.fillna("", inplace=True)
             dfs[nome] = d
             log.info("  %-10s: %d registros", nome, len(d))
 
-    df = dfs["principal"]
+    principal = ctx.dataset.arquivo_padrao
+    if principal not in dfs:
+        raise SystemExit(
+            f"O dataset '{ctx.dataset.nome}' não tem o arquivo '{principal}'. "
+            f"Encontrados: {sorted(dfs) or 'nenhum'}."
+        )
+    df = dfs[principal]
+
+    # O perfil ganha aqui o que der para induzir do corpus (sem efeito quando o
+    # perfil já traz o bloco). Precisa ser antes das fases que leem o domínio.
+    ctx.completar_com_dados(df)
 
     # --- Catálogo CATMAT (universo de busca) -------------------------------
     catalogo = (
@@ -404,23 +433,28 @@ def fase_1_rede_semantica(estado: dict) -> dict:
         return estado
 
     log.info("Construindo grafo léxico de domínio...")
-    G = construir_grafo("principal")
+    G = construir_grafo()
 
-    exportar_graphml(G, RESULTADOS_DIR / "rede_semantica.graphml")
-    exportar_skos(G, RESULTADOS_DIR / "rede_semantica_skos.ttl")
-    exportar_fila_curadoria(G, RESULTADOS_DIR / "fila_curadoria.csv")
+    exportar_graphml(G, dir_resultados() / "rede_semantica.graphml")
+    exportar_skos(G, dir_resultados() / "rede_semantica_skos.ttl")
+    exportar_fila_curadoria(G, dir_resultados() / "fila_curadoria.csv")
 
     log.info("Gerando visualizações do grafo...")
+    # O PDM em foco sai do perfil ou é o mais frequente do grafo — estava fixo
+    # em "AGULHA PUNCAO OSSEA", que não existe em nenhum outro domínio.
+    foco = perfil_ativo().pdm_foco_exemplo or pdm_mais_frequente(G)
     try:
-        visualizar_grafo(
-            G, pdm_foco="AGULHA PUNCAO OSSEA",
-            titulo="Vizinhança: AGULHA PUNCAO OSSEA",
-            salvar_em=RESULTADOS_DIR / "rede_semantica_agulha.png",
-        )
+        if foco:
+            from .config import sanitizar
+            visualizar_grafo(
+                G, pdm_foco=foco,
+                titulo=f"Vizinhança: {foco}",
+                salvar_em=dir_resultados() / f"rede_semantica_{sanitizar(foco)[:30].lower()}.png",
+            )
         visualizar_grafo(
             G, pdm_foco=None, max_nos=80,
             titulo="Rede Semântica CATMAT <-> e-Fisco (top 80 nós)",
-            salvar_em=RESULTADOS_DIR / "rede_semantica_geral.png",
+            salvar_em=dir_resultados() / "rede_semantica_geral.png",
         )
     except Exception as exc:
         log.warning("Visualização falhou (%s) — seguindo.", exc)
@@ -508,43 +542,20 @@ def fase_1_rede_semantica(estado: dict) -> dict:
 # ÚNICOS (não sobre pares), então o custo é linear no catálogo, não quadrático.
 # ---------------------------------------------------------------------------
 
-_RE_CALIBRE    = re.compile(r"\b(\d[\d,\.]*)\s*G(?:AUGE|A)?\b", re.IGNORECASE)
-_RE_COMPRIMENTO = re.compile(r"\b(\d[\d,\.]*)\s*(CM|MM|M)\b", re.IGNORECASE)
-_RE_VOLUME     = re.compile(r"\b(\d[\d,\.]*)\s*(ML|L)\b", re.IGNORECASE)
-_RE_DIMENSAO   = re.compile(
-    r"\b(\d[\d,\.]*)\s*(?:G|GA|GAUGE)?\s*[Xx]\s*(\d[\d,\.]*)\s*(CM|MM)?\b", re.IGNORECASE)
-_RE_LUER       = re.compile(r"LUER[\s\-]?LOCK|LUER[\s\-]?SLIP|LUER", re.IGNORECASE)
-_RE_ESTERIL    = re.compile(r"ESTERIL(?:IZADO)?|USO[\s\-]?UNICO", re.IGNORECASE)
-_RE_MATERIAL   = re.compile(
-    r"ACO[\s\-]?INOX(?:IDAVEL)?|PVC|POLIPROPILENO|LATEX|SILICONE|NIQUEL[\s\-]?TITANIO",
-    re.IGNORECASE)
-_RE_BISEL      = re.compile(r"BISEL[\s\-]?CORTANTE|BISEL[\s\-]?FACETADO|BISEL", re.IGNORECASE)
-_RE_MODELO     = re.compile(
-    r"\b(QUINCKE|TUOHY|WHITACRE|CRAWFORD|SPROTTE|CHIBA|VERESS)\b", re.IGNORECASE)
+# As nove regex do extrator determinístico saíram daqui para o perfil
+# (`extracao:` no YAML), onde cada regra declara que atributo preenche e de que
+# grupo de captura. Eram elas que traziam gauge, bisel e Luer para dentro do
+# orquestrador.
 
 
 def _canonicalizar_atributos_llm(bruto: dict) -> dict:
     """Normaliza o JSON da LLM para o mesmo formato do extrator regex, de modo
-    que a ontologia compare chaves e valores alinhados dos dois lados."""
-    if not isinstance(bruto, dict):
-        return {}
-    atribs = {}
-    for chave in _ATRIBUTOS_PDM_KEYS:
-        val = bruto.get(chave)
-        if val is None:
-            continue
-        val = normalizar_texto(str(val), manter_maiusculas=True).strip()
-        if not val:
-            continue
-        if chave == "calibre":
-            m = re.search(r"(\d[\d,\.]*)", val)
-            if not m:
-                continue
-            val = m.group(1) + "G"
-        elif chave in ("comprimento_unidade", "volume_unidade"):
-            val = val.upper()
-        atribs[chave] = val
-    return atribs
+    que a ontologia compare chaves e valores alinhados dos dois lados.
+
+    As regras por atributo (extrair número, concatenar sufixo, caixa alta) são
+    declaradas no perfil; ver `PerfilDominio.canonicalizar`.
+    """
+    return perfil_ativo().canonicalizar(bruto)
 
 
 def extrair_atributos_llm(texto: str, client, cache: dict,
@@ -557,23 +568,16 @@ def extrair_atributos_llm(texto: str, client, cache: dict,
     if chave in cache:
         return cache[chave]
 
+    # O papel e o esquema de chaves vêm do perfil: o prompt é conteúdo de
+    # domínio, e um prompt que fala de gauge e bisel extrai mal um catálogo de
+    # medicamentos. Ver `PerfilDominio.papel` e `bloco_prompt_atributos`.
+    perfil = perfil_ativo()
     prompt = (
-        "Você é um motor de extração de atributos para itens de compras públicas "
-        "hospitalares (Brasil / Material Médico Hospitalar). A partir da descrição "
-        "do item, extraia os atributos no esquema PDM e responda APENAS com um "
-        "objeto JSON. Use SOMENTE estas chaves (omita a chave se o atributo não "
-        "aparecer no texto; não invente valores):\n"
-        '  "calibre": dígitos+"G" (gauge), ex "15G", "18G"\n'
-        '  "comprimento_valor": número (use "." decimal), ex "5", "3.5"\n'
-        '  "comprimento_unidade": "MM" | "CM" | "M"\n'
-        '  "volume_valor": número; "volume_unidade": "ML" | "L"\n'
-        '  "dimensao": ex "5X10CM" (dois eixos)\n'
-        '  "conector": ex "LUER LOCK", "LUER SLIP"\n'
-        '  "esterilidade": "ESTERIL USO UNICO" quando estéril/uso único\n'
-        '  "material": MAIÚSCULAS sem acento, ex "ACO INOX", "PVC", '
-        '"POLIPROPILENO", "LATEX", "SILICONE", "NIQUEL TITANIO"\n'
-        '  "bisel": ex "BISEL CORTANTE"\n'
-        '  "modelo": MAIÚSCULAS, ex "QUINCKE", "TUOHY", "WHITACRE"\n'
+        f"{perfil.papel('extrator')} A partir da descrição do item, extraia os "
+        "atributos no esquema PDM e responda APENAS com um objeto JSON. Use "
+        "SOMENTE estas chaves (omita a chave se o atributo não aparecer no "
+        "texto; não invente valores):\n"
+        f"{perfil.bloco_prompt_atributos()}\n"
         "Todos os valores em MAIÚSCULAS e sem acento.\n\n"
         f"Descrição do item:\n{str(texto)[:400]}"
     )
@@ -589,9 +593,13 @@ def extrair_atributos_llm(texto: str, client, cache: dict,
 
 
 def extrair_atributos_regex(texto: str) -> dict:
-    """Fallback determinístico da camada de percepção (sem LLM/chave/API)."""
-    atribs = {}
-    t = normalizar_texto(texto, manter_maiusculas=True)
+    """Fallback determinístico da camada de percepção (sem LLM/chave/API).
+
+    As regras vêm do perfil de domínio; ver `PerfilDominio.extrair_regex`. Um
+    perfil sem regras devolve dicionário vazio, e a fase [2] registra a lacuna
+    em vez de fingir extração.
+    """
+    return perfil_ativo().extrair_regex(texto)
 
     if (m := _RE_CALIBRE.search(t)):
         atribs["calibre"] = m.group(1) + "G"
@@ -618,7 +626,9 @@ def extrair_atributos_regex(texto: str) -> dict:
 
 # Espaço de nomes da ontologia — o mesmo IRI da fase [4], para que uma
 # violação SHACL aqui e uma dedução OWL lá apontem para o mesmo :atributo.
-MMH = Namespace(f"{IRI_ONTOLOGIA}#")
+def _ns_dominio() -> Namespace:
+    """Espaço de nomes da ontologia do domínio ativo."""
+    return Namespace(f"{iri_ontologia()}#")
 
 
 def _construir_shapes_pdm() -> Graph:
@@ -626,21 +636,22 @@ def _construir_shapes_pdm() -> Graph:
     Shapes SHACL de verdade (o papel do SHACL na Figura 1): uma sh:NodeShape
     por família de PDM, com sh:minCount 1 para cada característica
     DEFINIDORA — a MESMA lista que a regra SWRL da fase [4] usa para deduzir
-    equivalência (CARACTERISTICAS_DEFINIDORAS). Gerado a partir dela, e não
+    equivalência (`atributos_definidores` do perfil). Gerado a partir dela, e não
     escrito à mão, para que as duas fases nunca divirjam sobre o que é
     "obrigatório" por família.
     """
+    DOM = _ns_dominio()
     shapes = Graph()
-    shapes.bind("mmh", MMH)
+    shapes.bind(perfil_ativo().prefixo, DOM)
     shapes.bind("sh", SH)
-    for familia, obrigatorios in CARACTERISTICAS_DEFINIDORAS.items():
-        forma = MMH[f"Forma{familia}"]
+    for familia, obrigatorios in caracteristicas_definidoras().items():
+        forma = DOM[f"Forma{familia}"]
         shapes.add((forma, RDF.type, SH.NodeShape))
-        shapes.add((forma, SH.targetClass, MMH[familia]))
+        shapes.add((forma, SH.targetClass, DOM[familia]))
         for atributo in obrigatorios:
             prop = BNode()
             shapes.add((forma, SH.property, prop))
-            shapes.add((prop, SH.path, MMH[atributo]))
+            shapes.add((prop, SH.path, DOM[atributo]))
             shapes.add((prop, SH.minCount, Literal(1)))
             shapes.add((prop, SH.severity, SH.Violation))
             shapes.add((prop, SH.message, Literal(
@@ -649,12 +660,21 @@ def _construir_shapes_pdm() -> Graph:
     return shapes
 
 
-_SHAPES_PDM = _construir_shapes_pdm()
+# Montado sob demanda e memorizado por domínio: no import o perfil ativo ainda
+# não é conhecido (a CLI só escolhe o dataset depois).
+_CACHE_SHAPES: dict[str, Graph] = {}
+
+
+def shapes_pdm() -> Graph:
+    nome = perfil_ativo().nome
+    if nome not in _CACHE_SHAPES:
+        _CACHE_SHAPES[nome] = _construir_shapes_pdm()
+    return _CACHE_SHAPES[nome]
 
 
 def validar_shacl_lote(atributos: list[dict], pdms: list[str]) -> list[dict]:
     """
-    Valida o esquema PDM extraído contra `_SHAPES_PDM` com o motor pyshacl
+    Valida o esquema PDM extraído contra `shapes_pdm()` com o motor pyshacl
     (SHACL-Core; sem inferência OWL, já que as shapes usam só sh:minCount).
 
     Roda numa ÚNICA passada sobre todas as linhas — um grafo de dados com um
@@ -662,23 +682,26 @@ def validar_shacl_lote(atributos: list[dict], pdms: list[str]) -> list[dict]:
     engine do pyshacl é fixo por chamada, então validar N grafos de 1 item
     cada é ~N vezes mais caro que validar 1 grafo de N indivíduos.
     """
+    DOM = _ns_dominio()
+    definidoras = caracteristicas_definidoras()
+    chaves = atributos_pdm_keys()
     dados = Graph()
-    dados.bind("mmh", MMH)
+    dados.bind(perfil_ativo().prefixo, DOM)
     nos = []  # (uri, obrigatorios) na ordem de entrada, para remontar a saída
     for i, (atribs, pdm) in enumerate(zip(atributos, pdms)):
         familia = _familia_de(pdm or "")
-        obrigatorios = CARACTERISTICAS_DEFINIDORAS.get(familia, [])
-        no = MMH[f"item_{i}"]
+        obrigatorios = definidoras.get(familia, [])
+        no = DOM[f"item_{i}"]
         nos.append((no, obrigatorios))
         if not familia:
             continue
-        dados.add((no, RDF.type, MMH[familia]))
+        dados.add((no, RDF.type, DOM[familia]))
         for chave, valor in (atribs or {}).items():
-            if chave in _ATRIBUTOS_PDM_KEYS and valor:
-                dados.add((no, MMH[chave], Literal(str(valor))))
+            if chave in chaves and valor:
+                dados.add((no, DOM[chave], Literal(str(valor))))
 
     conforms, relatorio, _ = pyshacl.validate(
-        dados, shacl_graph=_SHAPES_PDM, inference="none",
+        dados, shacl_graph=shapes_pdm(), inference="none",
         allow_warnings=True, meta_shacl=False,
     )
 
@@ -721,9 +744,9 @@ def fase_2_extracao(estado: dict) -> dict:
     if client is None:
         log.warning("[2] LLM indisponível (%s) — extração por regex.", motivo)
     else:
-        log.info("[2] Extração via %s (cache: %s)", LLM_MODEL_PADRAO, _CACHE_EXTRACAO_PATH)
+        log.info("[2] Extração via %s (cache: %s)", LLM_MODEL_PADRAO, cache_extracao_path())
 
-    cache = _carregar_cache_extracao(_CACHE_EXTRACAO_PATH)
+    cache = _carregar_cache_extracao(cache_extracao_path())
     stats_fonte = {"llm": 0, "regex": 0, "erros_llm": 0}
 
     def _extrair(texto: str) -> dict:
@@ -754,7 +777,7 @@ def fase_2_extracao(estado: dict) -> dict:
     catalogo["atributos"] = attrs_catalogo
 
     if client is not None:
-        _salvar_cache_extracao(cache, _CACHE_EXTRACAO_PATH)
+        _salvar_cache_extracao(cache, cache_extracao_path())
 
     # Validação de esquema — SHACL real (rdflib + pyshacl), papel da Figura 1
     consultas["shacl"] = validar_shacl_lote(
@@ -801,7 +824,7 @@ def fase_3_blocking(estado: dict) -> dict:
 
     Estratégia em cascata, da chave mais específica para a mais frouxa:
       1. PDM âncora idêntico
-      2. Subsunção: hiperônimos/hipônimos do PDM (HIERARQUIA_CURADA)
+      2. Subsunção: hiperônimos/hipônimos do PDM (hierarquia do perfil)
       3. PDM que compartilha a família (AGULHA, SERINGA, ...)
       4. Classe CATMAT igual à classe e-Fisco
       5. Último recurso: catálogo inteiro truncado por afinidade lexical
@@ -821,11 +844,11 @@ def fase_3_blocking(estado: dict) -> dict:
     por_classe: dict[str, list[int]] = defaultdict(list)
     por_familia: dict[str, list[int]] = defaultdict(list)
 
-    familias = list(HIERARQUIA_CURADA.keys()) + [
-        "AGULHA", "SERINGA", "CATETER", "SONDA", "FIO", "EQUIPO",
-        "LUVA", "TUBO", "DRENO", "MASCARA", "COMPRESSA", "ATADURA",
-    ]
-    familias = sorted(set(familias))
+    # A lista de famílias era literal aqui. Vem do perfil (`familias:` + as
+    # chaves da hierarquia curada); num domínio sem perfil, é induzida dos
+    # rótulos de PDM do próprio catálogo.
+    perfil = perfil_ativo()
+    familias = list(perfil.familias)
 
     for i, row in catalogo.iterrows():
         pdm = (row["pdm"] or "").strip().upper()
@@ -840,7 +863,7 @@ def fase_3_blocking(estado: dict) -> dict:
 
     # Subsunção: mapa PDM -> PDMs relacionados na hierarquia curada
     relacionados: dict[str, set] = defaultdict(set)
-    for hiper, hipos in HIERARQUIA_CURADA.items():
+    for hiper, hipos in perfil.hierarquia.items():
         h_up = hiper.upper()
         for hipo in hipos:
             relacionados[h_up].add(hipo.upper())
@@ -1005,7 +1028,7 @@ def fase_4_ontologia(estado: dict) -> dict:
     cod_por_idx = estado["cod_por_idx"]
 
     try:
-        from ontologia_owl_mmh import OntologiaMMH
+        from .ontologia_owl import OntologiaDominio
     except ImportError as exc:
         log.error("owlready2 indisponível (%s) — fase [4] sem dedução.", exc)
         estado["deducoes"] = {}
@@ -1015,7 +1038,7 @@ def fase_4_ontologia(estado: dict) -> dict:
     pdms = sorted({p for p in catalogo["pdm"] if p} |
                   {p for p in consultas["pdm_ancoragem"] if p})
 
-    onto = OntologiaMMH(pdms, HIERARQUIA_CURADA)
+    onto = OntologiaDominio(pdms, perfil_ativo().hierarquia)
 
     # Só entram na ABox os itens que realmente participam de algum par
     # candidato — reasoning sobre o universo inteiro seria desperdício.
@@ -1071,7 +1094,7 @@ def fase_4_ontologia(estado: dict) -> dict:
             contagem["incompleto"] += 1
 
     try:
-        onto.salvar(RESULTADOS_DIR / "ontologia_mmh.owl")
+        onto.salvar(dir_resultados() / "ontologia.owl")
     except Exception as exc:
         log.warning("Falha ao salvar a ontologia: %s", exc)
 
@@ -1397,7 +1420,7 @@ def _resumir_comunidades_graphrag(idx_para_com, consultas, client, cache, model,
             resumos[com_id] = cache[chave_hash].get("resumo", "")
             continue
         prompt = (
-            "Especialista em materiais medico-hospitalares do Brasil. "
+            f"{perfil_ativo().papel('especialista')} "
             "Descreva em UMA frase curta o que esses itens e-Fisco tem em comum "
             "(produto, material, finalidade):\n"
             + "\n".join(f"- {s}" for s in samples if s)
@@ -1462,7 +1485,7 @@ def _adjudicar_graphrag_llm(par: dict, contexto_local: list, contexto_global: st
     )
 
     prompt = (
-        "Voce e um auditor de compras publicas hospitalares (Brasil/MMH). "
+        f"{perfil_ativo().papel('auditor')} "
         "Decida se o item e-Fisco corresponde ao item CATMAT abaixo.\n\n"
         "PAR EM ANALISE:\n"
         f"  e-Fisco : {str(par['efisco'])[:220]}\n"
@@ -1528,7 +1551,7 @@ def fase_6_graphrag(estado: dict) -> dict:
     # ------------------------------------------------------------------ #
     # 1-3. Indexação Microsoft GraphRAG (cached)                          #
     # ------------------------------------------------------------------ #
-    import graphrag_mmh as gr
+    from . import graphrag as gr
     from pathlib import Path
 
     client, motivo = _construir_cliente_openai()
@@ -1583,7 +1606,7 @@ def fase_6_graphrag(estado: dict) -> dict:
     # ------------------------------------------------------------------ #
     # 5. Adjudicacao na zona cinzenta                                    #
     # ------------------------------------------------------------------ #
-    cache_adj = _carregar_cache_extracao(_CACHE_GRAPHRAG_PATH) if client else {}
+    cache_adj = _carregar_cache_extracao(cache_graphrag_path()) if client else {}
     zona_baixo, zona_alto = ZONA_CINZENTA
     alvos = [r for r in melhor.itertuples()
              if zona_baixo <= r.score_neural < zona_alto]
@@ -1648,7 +1671,7 @@ def fase_6_graphrag(estado: dict) -> dict:
         pares.at[idx, "graphrag_justificativa"] = justif
 
     if client is not None:
-        _salvar_cache_extracao(cache_adj, _CACHE_GRAPHRAG_PATH)
+        _salvar_cache_extracao(cache_adj, cache_graphrag_path())
 
     print("\n=== [6] GRAPHRAG (Microsoft GraphRAG) ===")
     print(f"  Indice GraphRAG         : {'OK' if gr_ok else 'fallback TF-IDF'}")
@@ -1896,7 +1919,7 @@ def fase_7_grafo_unificado(estado: dict) -> dict:
             Gu.add_edge(f"CATMAT_{row['codigo_catmat']}", f"PDM_{pdm}",
                         relacao="mapeadoAoPDM", peso=1.0)
 
-    destino = RESULTADOS_DIR / "grafo_unificado.graphml"
+    destino = dir_resultados() / "grafo_unificado.graphml"
     _xml_invalido = re.compile(r"[^\x09\x0A\x0D\x20-퟿-�]")
 
     Gx = Gu.copy()
@@ -1950,7 +1973,7 @@ def fase_8b_explicabilidade_llm(estado: dict) -> dict:
         estado["stats_fase8b"] = {"n_explicacoes": 0, "motivo_skip": motivo}
         return estado
 
-    cache = _carregar_cache_extracao(_CACHE_GRAPHRAG_PATH)
+    cache = _carregar_cache_extracao(cache_graphrag_path())
     alvos = top1[top1["confianca"] != "Alta"].head(60)
 
     explicacoes = {}
@@ -1963,7 +1986,8 @@ def fase_8b_explicabilidade_llm(estado: dict) -> dict:
             resp = client.chat.completions.create(
                 model=LLM_MODEL_PADRAO, max_tokens=120,
                 messages=[{"role": "user", "content":
-                    "Explique em UMA frase, para um auditor de compras públicas, por que "
+                    "Explique em UMA frase, para "
+                    f"{perfil_ativo().papel('auditor_curto')}, por que "
                     "o casamento abaixo ficou com confiança "
                     f"{r.confianca} (score {r.score_final:.2f}).\n\n{r.trilha[:700]}"}],
             )
@@ -1974,7 +1998,7 @@ def fase_8b_explicabilidade_llm(estado: dict) -> dict:
             log.warning("[8b] Falhou: %s", str(exc)[:140])
             break
 
-    _salvar_cache_extracao(cache, _CACHE_GRAPHRAG_PATH)
+    _salvar_cache_extracao(cache, cache_graphrag_path())
 
     pares = estado["pares"]
     pares["explicacao_llm"] = ""
@@ -2145,7 +2169,7 @@ def _plotar_analise(estado: dict, tam_comunidades: list) -> None:
     for ax in axes:
         ax.title.set_color("white")
     plt.tight_layout()
-    plt.savefig(RESULTADOS_DIR / "analise_global.png", dpi=130, facecolor=fig.get_facecolor())
+    plt.savefig(dir_resultados() / "analise_global.png", dpi=130, facecolor=fig.get_facecolor())
     plt.close(fig)
 
 
@@ -2165,7 +2189,7 @@ def exportar_resultados(estado: dict) -> None:
         "graphrag_justificativa", "trilha",
     ]
     cols = [c for c in cols if c in pares.columns]
-    pares[cols].to_csv(RESULTADOS_DIR / "resultado_pipeline_completo.csv",
+    pares[cols].to_csv(dir_resultados() / "resultado_pipeline_completo.csv",
                        index=False, sep="|", encoding="utf-8-sig")
 
     stats = {
@@ -2204,7 +2228,7 @@ def exportar_resultados(estado: dict) -> None:
             return float(o)
         return o
 
-    with open(RESULTADOS_DIR / "stats_pipeline.json", "w", encoding="utf-8") as fh:
+    with open(dir_resultados() / "stats_pipeline.json", "w", encoding="utf-8") as fh:
         json.dump(_limpar(stats), fh, ensure_ascii=False, indent=2)
 
     # YAML de apresentação: amostras por faixa de confiança
@@ -2228,7 +2252,7 @@ def exportar_resultados(estado: dict) -> None:
             "duplicatas": estado.get("duplicatas", [])[:20],
             "anomalias_para_curadoria": estado.get("anomalias", [])[:30],
         }
-        with open(RESULTADOS_DIR / "resultado_pipeline.yaml", "w", encoding="utf-8") as fh:
+        with open(dir_resultados() / "resultado_pipeline.yaml", "w", encoding="utf-8") as fh:
             yaml.safe_dump(saida, fh, allow_unicode=True, sort_keys=False)
 
 
@@ -2259,15 +2283,16 @@ def testar_llm_conexao() -> bool:
 
 def executar_pipeline_completo() -> dict:
     """Executa as fases [0]–[9] em sequência, cronometrando cada uma."""
+    ctx = contexto()
     print("\n" + "=" * 68)
-    print("  PIPELINE NEURO-SIMBÓLICO — CATMAT <-> e-Fisco (MMH)")
-    print("  Rede semântica + Ontologia OWL + Neural + GraphRAG")
+    print(f"  PIPELINE NEURO-SIMBÓLICO — CATMAT <-> e-Fisco [{ctx.dataset.nome}]")
+    print(f"  Domínio: {ctx.perfil.nome} | Rede semântica + OWL + Neural + GraphRAG")
     print(f"  LLM: {LLM_MODEL_PADRAO if USAR_LLM else 'DESLIGADA'} | "
           f"Rede semântica: {'ativa' if USAR_REDE else 'ABLAÇÃO'}")
     print("=" * 68)
 
     t_inicio = time.time()
-    RESULTADOS_DIR.mkdir(parents=True, exist_ok=True)
+    contexto().dataset.preparar_diretorios()
 
     with CRONO.medir("fase_0_fontes"):
         estado = fase_0_fontes()
@@ -2296,33 +2321,64 @@ def executar_pipeline_completo() -> dict:
 
     exportar_resultados(estado)
 
+    saida = dir_resultados()
     print("\n" + "=" * 68)
     print(f"  PIPELINE CONCLUÍDO em {time.time() - t_inicio:.1f}s")
-    print(f"  Resultado      : resultados/resultado_pipeline_completo.csv")
-    print(f"  Métricas       : resultados/stats_pipeline.json")
-    print(f"  Grafo unificado: resultados/grafo_unificado.graphml")
-    print(f"  Ontologia OWL  : resultados/ontologia_mmh.owl")
-    print(f"  Léxico SKOS    : resultados/rede_semantica_skos.ttl")
+    print(f"  Saída          : {saida}")
+    for nome in ("resultado_pipeline_completo.csv", "stats_pipeline.json",
+                 "grafo_unificado.graphml", "ontologia.owl",
+                 "rede_semantica_skos.ttl"):
+        print(f"    {nome}")
+    if ctx.perfil.lacunas:
+        print("  Lacunas do perfil de domínio (ver PERFIL no stats_pipeline.json):")
+        for lacuna in ctx.perfil.lacunas:
+            print(f"    - {lacuna}")
     print("=" * 68)
     return estado
 
 
-if __name__ == "__main__":
-    if "--smoke" in sys.argv:
-        sys.exit(0 if testar_llm_conexao() else 1)
-    if "--sem-llm" in sys.argv:
+def _cli() -> None:
+    """CLI do pipeline. Escolhe o dataset ANTES de qualquer leitura de dados."""
+    global USAR_LLM, USAR_REDE, LLM_MODEL_PADRAO
+
+    import argparse
+
+    from .config import ativar, listar_datasets, listar_perfis
+
+    ap = argparse.ArgumentParser(
+        description="Pipeline neuro-simbólico de casamento CATMAT <-> e-Fisco.")
+    ap.add_argument("--dataset", default="",
+                    help=f"dataset a processar. Disponíveis: {', '.join(listar_datasets())}")
+    ap.add_argument("--perfil", default="",
+                    help=f"força outro perfil de domínio ({', '.join(listar_perfis())})")
+    ap.add_argument("--smoke", action="store_true",
+                    help="testa a conexão com a API e sai")
+    ap.add_argument("--sem-llm", action="store_true",
+                    help="execução offline: regex do perfil no lugar da LLM")
+    ap.add_argument("--sem-rede", action="store_true",
+                    help="ablação: desliga a rede semântica da fase [1]")
+    ap.add_argument("--model", default="",
+                    help="modelo da LLM; isola a saída em resultados/<dataset>/<modelo>/")
+    args = ap.parse_args()
+
+    if args.smoke:
+        raise SystemExit(0 if testar_llm_conexao() else 1)
+
+    ctx = ativar(args.dataset, perfil=args.perfil)
+
+    if args.sem_llm:
         USAR_LLM = False
-    if "--sem-rede" in sys.argv:
+    if args.sem_rede:
         USAR_REDE = False
-    if "--model" in sys.argv:
-        _idx = sys.argv.index("--model")
-        if _idx + 1 < len(sys.argv):
-            LLM_MODEL_PADRAO = sys.argv[_idx + 1]
-            # Redireciona saídas para subpasta isolada por modelo
-            import rede_semantica_mmh as _rsm
-            _slug = LLM_MODEL_PADRAO.replace("/", "-").replace(":", "-")
-            _dir_modelo = DATA_DIR / "resultados" / _slug
-            globals()["RESULTADOS_DIR"] = _dir_modelo
-            _rsm.RESULTADOS_DIR = _dir_modelo
-            print(f"[--model] LLM: {LLM_MODEL_PADRAO} | saída: resultados/{_slug}/")
+    if args.model:
+        LLM_MODEL_PADRAO = args.model
+        # Saída isolada por modelo, para comparar LLMs lado a lado sem que uma
+        # execução sobrescreva a anterior.
+        ctx.dataset.sub_resultados = args.model.replace("/", "-").replace(":", "-")
+        print(f"[--model] LLM: {LLM_MODEL_PADRAO} | saída: {ctx.dataset.dir_resultados}")
+
     executar_pipeline_completo()
+
+
+if __name__ == "__main__":
+    _cli()

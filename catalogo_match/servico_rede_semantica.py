@@ -36,8 +36,9 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from preprocessamento_mmh import normalizar_texto, tokenizar, remover_stopwords
-from rede_semantica_mmh import (
+from .config import contexto, perfil_ativo
+from .preprocessamento import normalizar_texto, tokenizar, remover_stopwords
+from .rede_semantica import (
     construir_grafo,
     normalizar_termo,
     expandir_por_ativacao,
@@ -46,20 +47,25 @@ from rede_semantica_mmh import (
     ancorar_pdm,
     ancorar_registro,
     fila_curadoria,
-    VERSAO_LEXICO,
+    versao_lexico,
     _id_no,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
+# O dataset servido vem de CM_DATASET (um serviço não tem linha de comando).
+# Uma instância serve UM dataset; para servir dois, sobem-se dois processos com
+# portas diferentes, que é o que mantém o grafo em memória previsível.
+_CTX = contexto()
+
 app = FastAPI(
-    title="Rede Semântica de Domínio — CATMAT ↔ e-Fisco",
-    version=VERSAO_LEXICO,
+    title=f"Rede Semântica de Domínio — CATMAT ↔ e-Fisco [{_CTX.dataset.nome}]",
+    version=versao_lexico(),
     description=(
-        "Serviço de normalização, expansão e ancoragem do léxico de compras "
-        "públicas hospitalares. Prepara o texto curto e sujo do e-Fisco antes "
-        "de qualquer comparação — não decide o casamento."
+        "Serviço de normalização, expansão e ancoragem do léxico de "
+        f"{_CTX.perfil.descricao}. Prepara o texto curto e sujo do e-Fisco "
+        "antes de qualquer comparação — não decide o casamento."
     ),
 )
 
@@ -70,8 +76,9 @@ GRAFO = None
 @app.on_event("startup")
 def _carregar_grafo() -> None:
     global GRAFO
-    log.info("Construindo o grafo léxico (uma vez, na subida)...")
-    GRAFO = construir_grafo("principal")
+    log.info("Construindo o grafo léxico de '%s' (uma vez, na subida)...",
+             _CTX.dataset.nome)
+    GRAFO = construir_grafo()
     log.info("Grafo pronto: %d nós | %d arestas",
              GRAFO.number_of_nodes(), GRAFO.number_of_edges())
 
@@ -117,13 +124,13 @@ class DesambiguacaoEntrada(BaseModel):
 def saude() -> dict:
     """Estado do serviço e dimensão do léxico carregado."""
     if GRAFO is None:
-        return {"status": "carregando", "versao_lexico": VERSAO_LEXICO}
+        return {"status": "carregando", "versao_lexico": versao_lexico()}
     from collections import Counter
     tipos = Counter(d.get("tipo") for _, d in GRAFO.nodes(data=True))
     relacoes = Counter(d.get("relacao") for _, _, d in GRAFO.edges(data=True))
     return {
         "status": "pronto",
-        "versao_lexico": VERSAO_LEXICO,
+        "versao_lexico": versao_lexico(),
         "n_nos": GRAFO.number_of_nodes(),
         "n_arestas": GRAFO.number_of_edges(),
         "nos_por_tipo": dict(tipos),
@@ -299,5 +306,19 @@ def endpoint_termo(termo: str) -> dict:
 
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+
+    ap = argparse.ArgumentParser(description="Serviço HTTP do léxico de domínio.")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--dataset", default="",
+                    help="dataset a servir (ou use a variável CM_DATASET)")
+    _args = ap.parse_args()
+
+    if _args.dataset:
+        # Reativa antes de subir o servidor; o grafo só é construído no startup.
+        from .config import ativar
+        _CTX = ativar(_args.dataset)
+
+    uvicorn.run(app, host=_args.host, port=_args.port)

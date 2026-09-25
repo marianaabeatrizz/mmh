@@ -1,5 +1,5 @@
 """
-avaliacao_modular_mmh.py
+avaliacao_modular.py
 ========================
 Grade modular de avaliação — implementação da arquitetura de `pipeline.jpg`:
 
@@ -11,26 +11,28 @@ Cada célula da matriz é uma métrica de recuperação (MRR por padrão) do par
 (pré-processador, processador). Os pós-processadores reordenam o top-K de cada
 célula, e o ranking final ordena todas as combinações pré × proc × pós.
 
-Diferenças em relação ao `pipeline_completo_mmh.py`
+Diferenças em relação ao `pipeline.py`
 ---------------------------------------------------
 O pipeline monolítico executa UMA configuração fixa das fases [0]-[9]. Aqui cada
 etapa vira um módulo trocável e todas as combinações são medidas lado a lado.
 Não há blocking: cada consulta é pontuada contra o catálogo CATMAT inteiro, de
 modo que o teto é 100% e as células são comparáveis entre si.
 
-O GraphRAG entra em dois eixos, sobre o mesmo KG (`graphrag_mmh`):
+O GraphRAG entra em dois eixos, sobre o mesmo KG (`graphrag`):
   - PRÉ-PROCESSADOR (`graphrag`, `graphrag_leve`): expande a consulta com
     entidades vizinhas e o rótulo da comunidade antes da similaridade.
   - PÓS-PROCESSADOR (`graphrag`, `unidades_graphrag`): reordena o top-K pela
     cobertura das entidades da consulta pelo candidato.
 
 Uso:
-    python avaliacao_modular_mmh.py                        # grade completa
-    python avaliacao_modular_mmh.py --listar               # módulos disponíveis
-    python avaliacao_modular_mmh.py --amostra 200          # subamostra de consultas
-    python avaliacao_modular_mmh.py --pre nada,basico,graphrag --proc tfidf,fuzzy
-    python avaliacao_modular_mmh.py --metrica recall_at_3  # métrica das células
-    python avaliacao_modular_mmh.py --graphrag-ms          # usa o índice Microsoft
+    python -m catalogo_match.avaliacao_modular                       # grade completa
+    python -m catalogo_match.avaliacao_modular --listar              # módulos disponíveis
+    python -m catalogo_match.avaliacao_modular --amostra 200         # subamostra
+    python -m catalogo_match.avaliacao_modular --pre nada,basico --proc tfidf,fuzzy
+    python -m catalogo_match.avaliacao_modular --metrica recall_at_3 # métrica das células
+    python -m catalogo_match.avaliacao_modular --graphrag-ms         # índice Microsoft
+    python -m catalogo_match.avaliacao_modular --dataset mmh_opme    # outro corpus
+    python -m catalogo_match.avaliacao_modular --perfil base         # sem léxico curado
 """
 
 import argparse
@@ -61,7 +63,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import normalize as _normalize_linhas
 
 sys.path.insert(0, str(Path(__file__).parent))
-from preprocessamento_mmh import (
+from . import caracteristicas
+from .config import contexto, perfil_ativo
+from .preprocessamento import (
     extrair_atributos_catmat,
     normalizar_texto,
     preprocessar_texto_catmat,
@@ -73,12 +77,23 @@ from preprocessamento_mmh import (
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
 log = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).parent
-DADOS_DIR = BASE_DIR / "dados"
-RESULTADOS_DIR = BASE_DIR / "resultados"
-CACHE_EMB_DIR = BASE_DIR / "cache_embeddings"
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-ARQUIVO_PADRAO = "20260408_ground_truth_mmh_limpa.csv"
+# Pastas de saida e de cache sao POR DATASET: duas grades de datasets diferentes
+# nao devem sobrescrever a matriz uma da outra nem, pior, reusar embeddings do
+# corpus errado.
+
+
+def dir_resultados() -> Path:
+    d = contexto().dataset.dir_resultados
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def dir_cache_embeddings() -> Path:
+    d = contexto().dataset.dir_cache_embeddings
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 MODELO_EMBEDDING = "intfloat/multilingual-e5-base"
 MODELO_CROSS_ENCODER = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
@@ -92,6 +107,21 @@ K_CROSS_RERANK = 5
 
 # Peso do sinal do pós-processador na mistura com o score do processador
 PESO_POS_PADRAO = 0.25
+
+# Peso do sinal de medida, na forma ADITIVA (ver `_pos_aditivo`). O valor saiu
+# de varredura sobre as 1 012 consultas do MMH: 0,05 e o regime em que o sinal
+# desempata sem substituir a similaridade.
+#
+#   forma / peso              R@3      MRR
+#   convexa, peso >= 0,25   0,6601   0,5747   <- bonus domina; 0,25 e 0,60 dao
+#                                                 o MESMO resultado, porque o
+#                                                 ranking passa a ser ordenado
+#                                                 primeiro pelo bonus
+#   aditiva, peso 0,02      0,6700   0,5944
+#   aditiva, peso 0,05      0,6729   0,5858   <- escolhido
+#   aditiva, peso 0,10      0,6640   0,5787
+#   aditiva, peso 0,20      0,6621   0,5763
+PESO_MEDIDAS_PADRAO = 0.05
 
 
 class ModuloIndisponivel(RuntimeError):
@@ -109,7 +139,11 @@ class Corpus:
     consultas: pd.DataFrame
     catalogo: pd.DataFrame
     gold: dict[str, set]
-    arquivo: str = ARQUIVO_PADRAO
+    arquivo: str = ""
+    dataset: str = ""
+    # Chave lógica do arquivo no dataset ("principal", "test"): é o que a rede
+    # semântica precisa para construir o léxico sobre o MESMO corpus avaliado.
+    chave: str = ""
 
 
 @dataclass
@@ -136,20 +170,22 @@ class Modulo:
 # Carregamento do corpus
 # ---------------------------------------------------------------------------
 
-def carregar_corpus(arquivo: str = ARQUIVO_PADRAO,
+def carregar_corpus(arquivo: str = "",
                     amostra: int | None = None,
                     semente: int = 42) -> Corpus:
     """
     Lê o ground truth e separa catálogo (universo de busca), consultas e gabarito.
     Mesma semântica da fase [0] do pipeline, sem as dependências de LLM/OWL/SHACL.
-    """
-    caminho = DADOS_DIR / arquivo
-    if not caminho.exists():
-        raise FileNotFoundError(f"Ground truth não encontrado: {caminho}")
 
-    df = pd.read_csv(caminho, sep="|", dtype=str, encoding="utf-8-sig")
-    df.columns = df.columns.str.strip()
+    `arquivo` é a chave lógica do dataset ativo ("principal", "test") ou um nome
+    de arquivo; quem resolve caminho, separador e encoding é o DatasetSpec.
+    """
+    ctx = contexto()
+    caminho = ctx.dataset.caminho(arquivo)
+
+    df = ctx.dataset.ler(arquivo)
     df.fillna("", inplace=True)
+    ctx.completar_com_dados(df)
 
     catalogo = (
         df[["codigo_catmat", "item_catmat", "classe_catmat"]]
@@ -179,11 +215,12 @@ def carregar_corpus(arquivo: str = ARQUIVO_PADRAO,
         consultas = consultas.sample(n=amostra, random_state=semente).reset_index(drop=True)
         log.info("Subamostra: %d consultas (semente %d).", amostra, semente)
 
-    log.info("Corpus: %d consultas x %d itens de catálogo (%d com gabarito).",
-             len(consultas), len(catalogo),
+    log.info("Corpus [%s]: %d consultas x %d itens de catálogo (%d com gabarito).",
+             ctx.dataset.nome, len(consultas), len(catalogo),
              sum(1 for c in consultas["codigo_efisco"] if c in gold))
 
-    return Corpus(consultas=consultas, catalogo=catalogo, gold=dict(gold), arquivo=arquivo)
+    return Corpus(consultas=consultas, catalogo=catalogo, gold=dict(gold),
+                  arquivo=caminho.name, dataset=ctx.dataset.nome, chave=arquivo)
 
 
 # ---------------------------------------------------------------------------
@@ -214,18 +251,20 @@ def _pre_rede_semantica(corpus: Corpus, ctx: dict) -> Textos:
     propagação de ativação. Só as consultas são expandidas.
     """
     try:
-        from rede_semantica_mmh import (
+        from .rede_semantica import (
             construir_grafo,
             expandir_por_ativacao,
             normalizar_termo,
         )
     except Exception as exc:                       # dependências do grafo léxico
-        raise ModuloIndisponivel(f"rede_semantica_mmh indisponível: {exc}") from exc
+        raise ModuloIndisponivel(f"rede_semantica indisponível: {exc}") from exc
 
     G = ctx.get("_grafo_lexico")
     if G is None:
-        log.info("[pré/rede] Construindo grafo léxico de domínio...")
-        G = construir_grafo("principal")
+        log.info("[pré/rede] Construindo grafo léxico de domínio (%s)...",
+                 corpus.dataset or "dataset ativo")
+        # Mesmo corpus da avaliação: o léxico de um dataset não descreve outro.
+        G = construir_grafo(corpus.chave)
         ctx["_grafo_lexico"] = G
 
     base = _pre_basico(corpus, ctx)
@@ -252,9 +291,9 @@ def _pre_graphrag(corpus: Corpus, ctx: dict, *, pre_id: str = "graphrag",
                   incluir_comunidade: bool = True) -> Textos:
     """
     GraphRAG como pré-processador: expande a consulta com entidades recuperadas
-    por busca local no KG + rótulo da comunidade (`graphrag_mmh`).
+    por busca local no KG + rótulo da comunidade (`graphrag`).
     """
-    import graphrag_mmh as gr
+    from . import graphrag as gr
 
     base = _pre_basico(corpus, ctx)
 
@@ -354,7 +393,7 @@ def _embeddings_e5(textos: Textos, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
         (MODELO_EMBEDDING + "|" + "\n".join(textos.queries)
          + "|||" + "\n".join(textos.catalogo)).encode("utf-8")
     ).hexdigest()[:16]
-    arquivo_cache = CACHE_EMB_DIR / f"e5_{textos.pre_id}_{assinatura}.npz"
+    arquivo_cache = dir_cache_embeddings() / f"e5_{textos.pre_id}_{assinatura}.npz"
 
     if arquivo_cache.exists():
         dados = np.load(arquivo_cache)
@@ -371,7 +410,6 @@ def _embeddings_e5(textos: Textos, ctx: dict) -> tuple[np.ndarray, np.ndarray]:
                               batch_size=64, convert_to_numpy=True,
                               normalize_embeddings=True, show_progress_bar=False)
         emb = (emb_q.astype(np.float32), emb_c.astype(np.float32))
-        CACHE_EMB_DIR.mkdir(exist_ok=True)
         np.savez_compressed(arquivo_cache, q=emb[0], c=emb[1])
 
     ctx[chave] = emb
@@ -398,7 +436,7 @@ def _proc_e5_cross(textos: Textos, top_k: int, ctx: dict) -> tuple[np.ndarray, n
         (MODELO_CROSS_ENCODER + f"|{profundidade}|{top_k}|"
          + "\n".join(textos.queries) + "|||" + "\n".join(textos.catalogo)).encode("utf-8")
     ).hexdigest()[:16]
-    arquivo_cache = CACHE_EMB_DIR / f"cross_{textos.pre_id}_{assinatura}.npy"
+    arquivo_cache = dir_cache_embeddings() / f"cross_{textos.pre_id}_{assinatura}.npy"
 
     if chave in ctx:
         scores_cross = ctx[chave]
@@ -424,7 +462,6 @@ def _proc_e5_cross(textos: Textos, top_k: int, ctx: dict) -> tuple[np.ndarray, n
         brutos = np.asarray(ce.predict(pares, batch_size=64, show_progress_bar=False),
                             dtype=np.float32)
         scores_cross = (1.0 / (1.0 + np.exp(-brutos))).reshape(idx.shape[0], profundidade)
-        CACHE_EMB_DIR.mkdir(exist_ok=True)
         np.save(arquivo_cache, scores_cross)
         ctx[chave] = scores_cross
 
@@ -455,10 +492,9 @@ PROCESSADORES: dict[str, Modulo] = {
 # PÓS-PROCESSADORES — os círculos do diagrama
 # ---------------------------------------------------------------------------
 
-_RE_MEDIDA = re.compile(
-    r"(\d+(?:[\.,]\d+)?)\s*(MM|CM|ML|MG|MCG|KG|UI|POL|FR|CH|LITROS?|L|G)\b", re.IGNORECASE
-)
-_RE_GAUGE = re.compile(r"\b(\d{1,2})\s*G(?:A|AUGE)?\b", re.IGNORECASE)
+# As duas regex de medida (unidades e calibre) eram literais aqui, com gauge,
+# french e charriere dentro. Agora vêm do perfil: `medidas:` no YAML, com queda
+# para a tabela de unidades em uso quando o perfil não declara padrão.
 
 
 def _pos_nada(corpus: Corpus, textos: Textos, scores: np.ndarray,
@@ -469,11 +505,7 @@ def _pos_nada(corpus: Corpus, textos: Textos, scores: np.ndarray,
 
 def _medidas(texto: str) -> set:
     """Conjunto de pares (valor, unidade) normalizados presentes no texto."""
-    achados = {
-        (v.replace(",", "."), u.upper()) for v, u in _RE_MEDIDA.findall(texto or "")
-    }
-    achados |= {(v, "G_CALIBRE") for v in _RE_GAUGE.findall(texto or "")}
-    return achados
+    return perfil_ativo().medidas_de(texto)
 
 
 def _bonus_unidades(corpus: Corpus, textos: Textos, scores: np.ndarray,
@@ -517,7 +549,7 @@ def _bonus_graphrag(corpus: Corpus, textos: Textos, scores: np.ndarray,
     de tokens soltos (`TOK::AGULHA`): é o atributo que distingue itens da mesma
     família, e é dentro da família que o ranking se decide.
     """
-    import graphrag_mmh as gr
+    from . import graphrag as gr
 
     kg = ctx.get("_kg_graphrag")
     if kg is None:
@@ -541,9 +573,108 @@ def _bonus_graphrag(corpus: Corpus, textos: Textos, scores: np.ndarray,
     return bonus
 
 
+def _medidas_do_corpus(corpus: Corpus, ctx: dict) -> tuple[list, list]:
+    """Medidas tipadas dos dois lados, extraidas do texto CRU e memorizadas.
+
+    Texto cru, e nao o do pre-processador, porque a normalizacao do pipeline
+    remove aspas e apaga a polegada de `3 1/2"` -- uma das medidas que mais
+    discriminam no corpus.
+    """
+    if "_medidas" not in ctx:
+        perfil = perfil_ativo()
+        med_q = caracteristicas.indice(
+            corpus.consultas["item_efisco"].fillna("").astype(str).tolist(), perfil)
+        med_c = caracteristicas.indice(
+            corpus.catalogo["item_catmat"].fillna("").astype(str).tolist(), perfil)
+        r_q, r_c = caracteristicas.resumo(med_q), caracteristicas.resumo(med_c)
+        log.info("[pós/medidas] consultas com medida: %d/%d | catálogo: %d/%d | bases: %s",
+                 r_q["com_medida"], r_q["total"], r_c["com_medida"], r_c["total"],
+                 ", ".join(f"{k}={v}" for k, v in list(r_q["por_base"].items())[:6]))
+        ctx["_medidas"] = (med_q, med_c)
+        ctx["_medidas_resumo"] = {"consultas": r_q, "catalogo": r_c}
+    return ctx["_medidas"]
+
+
+def _bonus_medidas(corpus: Corpus, textos: Textos, scores: np.ndarray,
+                   idx: np.ndarray, ctx: dict) -> np.ndarray:
+    """
+    Fracao das medidas DA CONSULTA que o candidato satisfaz, em [0,1].
+
+    Mesma maquinaria de mistura do `unidades`, para que a comparacao entre os
+    dois isole o que mudou: a EXTRACAO. Onde `unidades` compara o par
+    (valor, unidade) como texto -- e por isso nunca casa `3 1/2"` com `90 MM`,
+    nem reconhece `G16` --, aqui os dois lados vao para a unidade base da
+    categoria antes de comparar, com tolerancia relativa.
+
+    Ancorado na consulta: o denominador e o numero de categorias que a CONSULTA
+    enuncia, nao as do candidato. Normalizar pelo candidato pune o item mais
+    especifico, que e justamente o certo -- foi o erro que derrubou as variantes
+    de atributo categorico (26% x 28% contra o acaso).
+    """
+    med_q, med_c = _medidas_do_corpus(corpus, ctx)
+    tol = ctx.get("tolerancia_medidas", caracteristicas.TOLERANCIA_PADRAO)
+    bonus = np.zeros_like(scores)
+    for i in range(idx.shape[0]):
+        mq = med_q[i]
+        if not mq:
+            continue
+        for k, j in enumerate(idx[i]):
+            bonus[i, k] = caracteristicas.satisfacao(mq, med_c[int(j)], tol)
+    return bonus
+
+
+def _pos_medidas_conflito(corpus: Corpus, textos: Textos, scores: np.ndarray,
+                          idx: np.ndarray, ctx: dict) -> np.ndarray:
+    """
+    Variante com PENALIDADE de conflito, somada com sinal ao score.
+
+    Mantida para registro porque a medicao a reprovou: R@3 0,601 contra 0,604 do
+    ranking sem pos-processamento. O diagnostico que a motivou olhava so as
+    falhas (o sinal acerta 46 contra 9 entre as consultas cujo correto estava no
+    top4-10) e nao media o dano nas 401 consultas que ja acertavam no top-1 --
+    onde penalizar conflito derruba acerto. Premiar acordo funciona; punir
+    divergencia, neste corpus, nao.
+    """
+    med_q, med_c = _medidas_do_corpus(corpus, ctx)
+    peso = ctx.get("peso_medidas", PESO_MEDIDAS_PADRAO)
+    tol = ctx.get("tolerancia_medidas", caracteristicas.TOLERANCIA_PADRAO)
+    ajustados = scores.copy()
+    for i in range(idx.shape[0]):
+        mq = med_q[i]
+        if not mq:
+            continue
+        for k, j in enumerate(idx[i]):
+            c = caracteristicas.concordancia(mq, med_c[int(j)], tol)
+            if c:
+                ajustados[i, k] = scores[i, k] + peso * c
+    return ajustados
+
+
 def _misturar(scores: np.ndarray, bonus: np.ndarray, peso: float) -> np.ndarray:
     """Mistura convexa entre o score do processador e o sinal do pós-processador."""
     return (1.0 - peso) * scores + peso * bonus
+
+
+def _pos_aditivo(*bonus_fns: Callable) -> Callable:
+    """
+    Monta um pos-processador que SOMA o sinal ao score, com peso pequeno.
+
+    Difere de `_pos_de`, que faz mistura convexa. A diferenca foi medida e
+    importa: com peso >= 0,25 na forma convexa o bonus domina a similaridade e o
+    ranking vira "ordena por bonus, desempata por E5" -- o que explica 0,25 e
+    0,60 darem resultado identico. Somado com peso 0,05, o sinal fica na escala
+    do espalhamento do E5 (~0,1 entre o 1o e o 10o colocado) e refina o ranking
+    em vez de substitui-lo: R@3 0,6729 contra 0,6601 da forma convexa.
+
+    Aqui `peso_medidas` e o parametro, e nao `peso_pos`, para que ajustar este
+    sinal nao mexa nos pos-processadores publicados em RESULTADOS.md.
+    """
+    def aplicar(corpus: Corpus, textos: Textos, scores: np.ndarray,
+                idx: np.ndarray, ctx: dict) -> np.ndarray:
+        total = sum(fn(corpus, textos, scores, idx, ctx) for fn in bonus_fns)
+        peso = ctx.get("peso_medidas", PESO_MEDIDAS_PADRAO)
+        return scores + peso * (total / len(bonus_fns))
+    return aplicar
 
 
 def _pos_de(*bonus_fns: Callable) -> Callable:
@@ -575,6 +706,20 @@ POS_PROCESSADORES: dict[str, Modulo] = {
     "unidades_graphrag": Modulo("unidades_graphrag", "Unidades + GraphRAG",
                                 _pos_de(_bonus_unidades, _bonus_graphrag),
                                 f"os dois sinais com peso igual (peso {PESO_POS_PADRAO})"),
+    "medidas": Modulo("medidas", "Medida tipada (com conversão)",
+                      _pos_aditivo(_bonus_medidas),
+                      "valor+unidade convertidos à base da categoria, ancorado "
+                      f"na consulta (aditivo, peso {PESO_MEDIDAS_PADRAO})"),
+    "medidas_graphrag": Modulo("medidas_graphrag", "Medida tipada + GraphRAG",
+                               _pos_aditivo(_bonus_medidas, _bonus_graphrag),
+                               "medida convertida + cobertura de entidades do KG "
+                               "(a melhor combinação medida na grade)"),
+    "medidas_unidades": Modulo("medidas_unidades", "Medida tipada + unidades",
+                               _pos_aditivo(_bonus_medidas, _bonus_unidades),
+                               "medida convertida e equivalência textual de unidade"),
+    "medidas_conflito": Modulo("medidas_conflito", "Medida tipada, com penalidade",
+                               _pos_medidas_conflito,
+                               "variante reprovada na medição; ver docstring"),
 }
 
 
@@ -712,14 +857,22 @@ def _assinatura_pre(mod: Modulo, corpus: Corpus) -> str:
     fora o resto deste arquivo, para editar gráfico ou CLI não invalidar textos
     caros de recomputar.
     """
-    partes = [mod.id, corpus.arquivo, str(len(corpus.consultas)), str(len(corpus.catalogo))]
+    ctx = contexto()
+    partes = [mod.id, corpus.arquivo, ctx.dataset.nome, ctx.perfil.nome,
+              str(len(corpus.consultas)), str(len(corpus.catalogo))]
     for fn in (mod.fn, _pre_basico, _pre_graphrag):
         try:
             partes.append(inspect.getsource(fn))
         except OSError:
             pass
-    for nome in ("preprocessamento_mmh.py", "rede_semantica_mmh.py", "graphrag_mmh.py"):
-        caminho = BASE_DIR / nome
+    for nome in ("preprocessamento.py", "rede_semantica.py", "graphrag.py", "config.py"):
+        caminho = BASE_DIR / "catalogo_match" / nome
+        if caminho.exists():
+            partes.append(caminho.read_text(encoding="utf-8"))
+    # O YAML do perfil entra na assinatura: mudar uma stopword muda os textos,
+    # e um cache que sobrevivesse a isso devolveria resultado de outro domínio.
+    for yaml_perfil in ("base.yaml", f"{ctx.perfil.nome}.yaml"):
+        caminho = BASE_DIR / "config" / "perfis" / yaml_perfil
         if caminho.exists():
             partes.append(caminho.read_text(encoding="utf-8"))
     return hashlib.sha1("|".join(partes).encode("utf-8")).hexdigest()[:16]
@@ -733,7 +886,7 @@ def _pre_com_cache(mod: Modulo, corpus: Corpus, ctx: dict) -> Textos:
     grafo léxico da fase [1] tem passo estocástico, então sem cache a linha
     `rede_semantica` muda de uma execução para outra.
     """
-    arquivo = CACHE_EMB_DIR / f"pre_{mod.id}_{_assinatura_pre(mod, corpus)}.json"
+    arquivo = dir_cache_embeddings() / f"pre_{mod.id}_{_assinatura_pre(mod, corpus)}.json"
 
     if arquivo.exists() and not ctx.get("sem_cache"):
         dados = json.loads(arquivo.read_text(encoding="utf-8"))
@@ -742,7 +895,6 @@ def _pre_com_cache(mod: Modulo, corpus: Corpus, ctx: dict) -> Textos:
                       catalogo=dados["catalogo"], meta=dados["meta"])
 
     textos = mod.fn(corpus, ctx)
-    CACHE_EMB_DIR.mkdir(exist_ok=True)
     arquivo.write_text(
         json.dumps({"queries": textos.queries, "catalogo": textos.catalogo,
                     "meta": textos.meta}, ensure_ascii=False),
@@ -844,7 +996,7 @@ def plotar_matriz(matriz: pd.DataFrame, metrica: str,
     from matplotlib.colors import LinearSegmentedColormap
     from matplotlib.patches import Rectangle
 
-    caminho = caminho or (RESULTADOS_DIR / "matriz_modular.png")
+    caminho = caminho or (dir_resultados() / "matriz_modular.png")
     dados = matriz.astype(float)
     valores = dados.values
     n_lin, n_col = valores.shape
@@ -909,7 +1061,6 @@ def plotar_matriz(matriz: pd.DataFrame, metrica: str,
     fig.text(0.02, 0.925, f"{legenda}{' · ' + subtitulo if subtitulo else ''}",
              fontsize=9.5, color=_TINTA_MUTED, ha="left")
 
-    RESULTADOS_DIR.mkdir(exist_ok=True)
     fig.savefig(caminho, bbox_inches="tight", facecolor=_SUPERFICIE)
     plt.close(fig)
     return caminho
@@ -919,7 +1070,6 @@ def exportar(corpus: Corpus, combinacoes: list[dict], ordenadas: list[dict],
              matriz: pd.DataFrame, metrica: str, top_k: int,
              ids_pre: list[str], ids_proc: list[str], ids_pos: list[str]) -> None:
     """Grava o YAML da grade + a matriz e o ranking em CSV."""
-    RESULTADOS_DIR.mkdir(exist_ok=True)
 
     documento = {
         "INFO": {
@@ -928,11 +1078,15 @@ def exportar(corpus: Corpus, combinacoes: list[dict], ordenadas: list[dict],
             "METRICA_MATRIZ": metrica,
             "TOP_K_CANDIDATOS": top_k,
             "DADOS": {
+                "DATASET": corpus.dataset,
                 "GROUND_TRUTH": corpus.arquivo,
                 "N_CONSULTAS": len(corpus.consultas),
                 "N_CATALOGO": len(corpus.catalogo),
                 "BLOCKING": "nenhum — catálogo inteiro por consulta",
             },
+            # Proveniência do conhecimento de domínio: quanto deste resultado
+            # vem de curadoria humana e quanto foi induzido do corpus.
+            "PERFIL": perfil_ativo().resumo(),
             "MODULOS": {
                 "PRE": [{"ID": i, "NOME": PRE_PROCESSADORES[i].nome,
                          "DESCRICAO": PRE_PROCESSADORES[i].descricao} for i in ids_pre],
@@ -965,14 +1119,14 @@ def exportar(corpus: Corpus, combinacoes: list[dict], ordenadas: list[dict],
         ],
     }
 
-    caminho_yaml = RESULTADOS_DIR / "avaliacao_modular.yaml"
+    caminho_yaml = dir_resultados() / "avaliacao_modular.yaml"
     with open(caminho_yaml, "w", encoding="utf-8") as fh:
         yaml.safe_dump(documento, fh, allow_unicode=True, sort_keys=False, width=100)
 
-    caminho_matriz = RESULTADOS_DIR / "matriz_pre_x_proc.csv"
+    caminho_matriz = dir_resultados() / "matriz_pre_x_proc.csv"
     matriz.to_csv(caminho_matriz, encoding="utf-8-sig")
 
-    caminho_rank = RESULTADOS_DIR / "ranking_combinacoes.csv"
+    caminho_rank = dir_resultados() / "ranking_combinacoes.csv"
     pd.DataFrame([
         {"posicao": p, "combinacao": c["combinacao"], "pre": c["pre"],
          "proc": c["proc"], "pos": c["pos"], **c["metricas"],
@@ -1022,9 +1176,16 @@ def _selecionar(pedidos: str | None, registro: dict[str, Modulo], eixo: str) -> 
 
 
 def main() -> None:
+    from .config import ativar, listar_datasets, listar_perfis
+
     ap = argparse.ArgumentParser(
         description="Grade modular pré × proc × pós para o casamento CATMAT <-> e-Fisco."
     )
+    ap.add_argument("--dataset", default="",
+                    help=f"dataset a avaliar. Disponíveis: {', '.join(listar_datasets())}")
+    ap.add_argument("--perfil", default="",
+                    help=f"força outro perfil de domínio ({', '.join(listar_perfis())}). "
+                         "Usar `base` mede o pipeline sem conhecimento curado.")
     ap.add_argument("--pre", help="pré-processadores (csv de ids)")
     ap.add_argument("--proc", help="processadores (csv de ids)")
     ap.add_argument("--pos", help="pós-processadores (csv de ids)")
@@ -1033,9 +1194,16 @@ def main() -> None:
     ap.add_argument("--amostra", type=int, help="usa só N consultas (execução rápida)")
     ap.add_argument("--top-k", type=int, default=K_CANDIDATOS,
                     help=f"candidatos retidos por consulta (padrão: {K_CANDIDATOS})")
-    ap.add_argument("--arquivo", default=ARQUIVO_PADRAO, help="ground truth em dados/")
+    ap.add_argument("--arquivo", default="",
+                    help="chave lógica do arquivo no dataset (padrão: a do YAML)")
     ap.add_argument("--peso-pos", type=float, default=PESO_POS_PADRAO,
                     help=f"peso do pós-processador na mistura (padrão: {PESO_POS_PADRAO})")
+    ap.add_argument("--peso-medidas", type=float, default=PESO_MEDIDAS_PADRAO,
+                    help=f"peso do ajuste de medida tipada (padrão: {PESO_MEDIDAS_PADRAO})")
+    ap.add_argument("--tolerancia-medidas", type=float,
+                    default=caracteristicas.TOLERANCIA_PADRAO,
+                    help="tolerância relativa no casamento de medidas "
+                         f"(padrão: {caracteristicas.TOLERANCIA_PADRAO})")
     ap.add_argument("--k-cross", type=int, default=K_CROSS_RERANK,
                     help=f"profundidade do cross-encoder (padrão: {K_CROSS_RERANK})")
     ap.add_argument("--graphrag-ms", action="store_true",
@@ -1049,12 +1217,16 @@ def main() -> None:
         _listar_modulos()
         return
 
+    ativar(args.dataset, perfil=args.perfil)
+
     ids_pre = _selecionar(args.pre, PRE_PROCESSADORES, "pré-processador")
     ids_proc = _selecionar(args.proc, PROCESSADORES, "processador")
     ids_pos = _selecionar(args.pos, POS_PROCESSADORES, "pós-processador")
 
     ctx = {
         "peso_pos": args.peso_pos,
+        "peso_medidas": args.peso_medidas,
+        "tolerancia_medidas": args.tolerancia_medidas,
         "k_cross": args.k_cross,
         "sem_cache": args.sem_cache,
         "graphrag_ms": args.graphrag_ms,

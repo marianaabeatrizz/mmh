@@ -1,0 +1,18 @@
+# Dataset MMH — Material Médico Hospitalar, CATMAT <-> e-Fisco/CADMAT (SAD-PE).
+# É o dataset das execuções documentadas em RESULTADOS.md.
+
+nome: mmh
+descricao: Material Médico Hospitalar — casamento CATMAT <-> e-Fisco (Pernambuco)
+perfil: mmh
+
+separador: "|"
+encoding: utf-8-sig
+arquivo_padrao: principal
+
+arquivos:
+  principal: dados/mmh/20260408_ground_truth_mmh_limpa.csv
+  test:      dados/mmh/20260408_ground_truth_mmh_test.csv
+  opme_test: dados/mmh/20260408_ground_truth_mmh_opme_test.csv
+
+# `colunas:` só é necessário quando o CSV usa outros nomes; o mapeamento é
+# destino_interno: coluna_no_arquivo. Aqui o arquivo já está no esquema interno.
